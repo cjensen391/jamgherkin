@@ -1,0 +1,30 @@
+{
+  "name": "jamgherkin",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "runQA": "tsx src/index.ts",
+    "discover": "tsx src/discover.ts"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.78.0",
+    "@google/generative-ai": "^0.24.1",
+    "@modelcontextprotocol/sdk": "^1.27.1",
+    "@types/node": "^25.3.5",
+    "cypress": "^15.11.0",
+    "dotenv": "^17.3.1",
+    "playwright": "^1.58.2",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.3"
+  },
+  "devDependencies": {
+    "@types/dotenv": "^6.1.1",
+    "tsx": "^4.21.0"
+  }
+}
