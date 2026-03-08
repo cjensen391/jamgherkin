@@ -49,17 +49,18 @@ async function main() {
                 if (await tabLocator.isVisible()) {
                     await tabLocator.click();
                     await page.waitForTimeout(1000); // Wait for tab content to render
+
+                    // Grab the text of the body while THIS tab is active, appending it to the context
+                    const tabContent = await page.innerText('body');
+                    extractedContext += `\\n--- TAB: ${tabName} ---\\n${tabContent}\\n`;
                 }
             } catch (e) {
                 // Ignore if tab isn't found or clickable
             }
         }
 
-        // Finally, extract the entire innerText of the app to grab all revealed logs and events
-        const bodyContent = await page.innerText('body');
-
         // Basic initial sanitization to redact passwords, JWT tokens, and API keys before sending to Claude
-        const redactedContent = bodyContent
+        const redactedContent = extractedContext
             .replace(/(["']?password["']?\s*[:=]\s*["']?)([^"'\s,}]+)(["']?)/gi, '$1***REDACTED***$3')
             .replace(/(bearer\s+)([A-Za-z0-9_=\-\.]+)/gi, '$1***REDACTED***')
             .replace(/(["']?api_?key["']?\s*[:=]\s*["']?)([^"'\s,}]+)(["']?)/gi, '$1***REDACTED***$3')
@@ -101,7 +102,7 @@ async function main() {
         console.log("\n--- Cypress Test ---");
         console.log(cypressTest);
 
-        const cypressPath = path.join(process.cwd(), "cypress", "e2e", `${safeTitle}.cy.js`);
+        const cypressPath = path.join(process.cwd(), "cypress", "e2e", `${safeTitle}.cy.ts`);
         fs.mkdirSync(path.dirname(cypressPath), { recursive: true });
         fs.writeFileSync(cypressPath, cypressTest);
         console.log(`\n💾 Saved Cypress test to: ${cypressPath}`);

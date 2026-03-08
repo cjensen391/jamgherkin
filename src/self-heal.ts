@@ -46,14 +46,14 @@ export async function aiHealAction(
         });
 
         // Limit the DOM payload to around 50k chars just in case (roughly 12k tokens)
-        const truncatedDom = rawBody.substring(0, 50000);
+        const truncatedDom = rawBody.length > 50000 ? rawBody.substring(0, 50000) : rawBody;
 
-        console.log("Asking Claude for a new selector...");
+        console.log(`Asking Claude for a new selector... (extracted DOM length: ${truncatedDom.length})`);
         // Call Claude
         const newSelector = await claude.healSelector(originalSelector, description, truncatedDom);
 
         console.log(`✅ Healing complete. New selector proposed by Claude: '${newSelector}'`);
-        const newLocator = page.locator(newSelector);
+        const newLocator = page.locator(newSelector).first();
 
         // Try the action again with the new locator
         await newLocator.waitFor({ state: 'attached', timeout: 5000 });

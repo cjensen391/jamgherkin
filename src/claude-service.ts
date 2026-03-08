@@ -34,7 +34,7 @@ export class ClaudeService {
 
       Instructions:
       1. Identify the core user flow or bug being demonstrated.
-      2. Write a complete ${framework} test file.
+      2. Write a complete ${framework} test file using TypeScript.
       3. Use best practices (descriptive test names, proper selectors).
       4. Include comments explaining key steps.
       5. If the flow involves logging in or authentication, use environment variables for credentials:
@@ -44,8 +44,9 @@ export class ClaudeService {
       ${framework === 'playwright' ? `6. VERY IMPORTANT: Instead of standard await page.locator(...).click() or fill(), you MUST use the self-healing wrappers aiClick and aiFill. 
          - Import them: import { aiClick, aiFill } from "../src/self-heal.js";
          - Use them: await aiClick(page, "button.submit", "Submit the login form");
-                                await aiFill(page, "input#email", process.env.TEST_EMAIL ?? "", "Fill the email field");` : `6. IMPORTANT: Identify any significant network requests (API calls) that occur immediately after a user click or interaction. Add code to intercept/alias these network calls and wait for them to complete before proceeding to the next step (e.g., page.waitForResponse or cy.intercept/cy.wait).`}
-      7. Output ONLY the code block for the test file.
+                                await aiFill(page, "input#email", process.env.TEST_EMAIL ?? "", "Fill the email field");
+         - NEVER use \`networkidle\` for Playwright's \`waitForLoadState\` or \`waitForNavigation\`. Modern websites like Digg.com often never reach network idle due to background requests or ads. Use \`domcontentloaded\` instead.` : `6. IMPORTANT: Identify any significant network requests (API calls) that occur immediately after a user click or interaction. Add code to intercept/alias these network calls and wait for them to complete before proceeding to the next step (e.g., page.waitForResponse or cy.intercept/cy.wait).`}
+      7. Output ONLY the raw TypeScript code, DO NOT INCLUDE markdown formatting backticks (\`\`\`) at the beginning or end of the output.
     `;
 
         try {
@@ -58,12 +59,9 @@ export class ClaudeService {
             // Anthropic specifically returns text in the block content
             const block = response.content.find(block => block.type === 'text');
             if (block && block.type === 'text') {
-                let text = block.text;
-                if (text.startsWith("\`\`\`")) {
-                    const firstNewline = text.indexOf("\\n");
-                    if (firstNewline !== -1) text = text.substring(firstNewline + 1);
-                }
-                if (text.endsWith("\`\`\`")) text = text.substring(0, text.length - 3);
+                let text = block.text.trim();
+                text = text.replace(/^```[a-zA-Z0-9-]*\n/i, "");
+                text = text.replace(/\n```$/i, "");
 
                 return text.trim();
             }
@@ -83,7 +81,8 @@ export class ClaudeService {
       Here is the current HTML DOM context from the page where the failure occurred:
       ${domContext}
 
-      Your task is to analyze the DOM and provide a new, highly resilient and accurate Playwright locator string (e.g., text="Submit" or div.login-wrapper > button.primary) that successfully identifies the target element.
+      Your task is to analyze the DOM and provide a new, highly resilient, UNIQUE, and accurate Playwright locator string (e.g., text="Submit" or div.login-wrapper > button.primary) that successfully identifies the target element.
+      It MUST uniquely identify the element to avoid Playwright strict mode violations.
       
       Output ONLY the raw selector string. Do not include quotes around it unless they are part of the selector syntax itself. Do not include any formatting or explanation.
     `;

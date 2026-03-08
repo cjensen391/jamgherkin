@@ -23,15 +23,18 @@ export class GeminiService {
       
       Instructions:
       1. Identify the core user flow or bug being demonstrated.
-      2. Write a complete ${framework} test file.
+      2. Write a complete ${framework} test file using TypeScript.
       3. Use best practices (descriptive test names, proper selectors).
       4. Include comments explaining key steps.
       5. IMPORTANT: Identify any significant network requests (API calls) that occur immediately after a user click or interaction. Add code to intercept/alias these network calls and wait for them to complete before proceeding to the next step (e.g., page.waitForResponse or cy.intercept/cy.wait).
-      6. Output ONLY the code block for the test file.
+      6. Output ONLY the raw TypeScript code, DO NOT INCLUDE markdown formatting backticks (\`\`\`) at the beginning or end of the output.
     `;
 
         const result = await this.model.generateContent(prompt);
         const response = await result.response;
-        return response.text();
+        let text = response.text().trim();
+        text = text.replace(/^```[a-zA-Z0-9-]*\n/i, "");
+        text = text.replace(/\n```$/i, "");
+        return text.trim();
     }
 }
