@@ -3,6 +3,7 @@ import { ClaudeService } from "./claude-service.js";
 import dotenv from "dotenv";
 import fs from "fs";
 import path from "path";
+import { spawnSync } from "child_process";
 dotenv.config();
 
 process.on('unhandledRejection', (reason, promise) => {
@@ -116,6 +117,18 @@ async function main() {
         console.log(`\n💾 Saved Gherkin feature to: ${gherkinPath}`);
 
         console.log("\n✅ Generation complete!");
+
+        console.log("\n6. Running generated Playwright test (headed)...");
+        const result = spawnSync(
+            "npx",
+            ["playwright", "test", playwrightPath, "--headed"],
+            { stdio: "inherit", cwd: process.cwd() }
+        );
+        if (result.status !== 0) {
+            console.error(`\n⚠️  Playwright test failed or encountered an error (exit code ${result.status}).`);
+        } else {
+            console.log("\n✅ Playwright test run complete.");
+        }
 
     } catch (error) {
         console.error("Error:", error);
