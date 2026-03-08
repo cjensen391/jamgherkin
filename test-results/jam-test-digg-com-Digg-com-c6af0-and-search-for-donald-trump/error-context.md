@@ -1,0 +1,833 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e1]:
+  - generic [ref=e2]:
+    - complementary [ref=e3]:
+      - link [ref=e4] [cursor=pointer]:
+        - /url: /
+        - img [ref=e5]
+      - generic [ref=e16]:
+        - generic [ref=e17]:
+          - generic [ref=e18]: Digg
+          - generic [ref=e19]:
+            - link "Community Avatar" [ref=e20] [cursor=pointer]:
+              - /url: /askdigg
+              - img "Community Avatar" [ref=e22]
+            - link "Community Avatar" [ref=e23] [cursor=pointer]:
+              - /url: /digg
+              - img "Community Avatar" [ref=e25]
+            - link "Community Avatar" [ref=e26] [cursor=pointer]:
+              - /url: /diggnation
+              - img "Community Avatar" [ref=e28]
+        - generic [ref=e29]:
+          - generic [ref=e30]: Top
+          - generic [ref=e31]:
+            - link "Community Avatar" [ref=e32] [cursor=pointer]:
+              - /url: /movies
+              - img "Community Avatar" [ref=e34]
+            - link "Community Avatar" [ref=e35] [cursor=pointer]:
+              - /url: /claude
+              - img "Community Avatar" [ref=e37]
+            - link "Community Avatar" [ref=e38] [cursor=pointer]:
+              - /url: /oldweb
+              - img "Community Avatar" [ref=e40]
+            - link "Community Avatar" [ref=e41] [cursor=pointer]:
+              - /url: /oddlysatisfying
+              - img "Community Avatar" [ref=e43]
+            - link "Community Avatar" [ref=e44] [cursor=pointer]:
+              - /url: /formula1
+              - img "Community Avatar" [ref=e46]
+            - link "Community Avatar" [ref=e47] [cursor=pointer]:
+              - /url: /apple
+              - img "Community Avatar" [ref=e49]
+            - link "Navigate to explore communities page" [ref=e50] [cursor=pointer]:
+              - /url: /d/discover/communities
+              - img [ref=e51]
+              - generic [ref=e53]: Navigate to explore communities page
+      - button "Signup or Login" [ref=e55] [cursor=pointer]:
+        - img [ref=e56]
+        - generic [ref=e59]: Signup or Login
+    - generic [ref=e60]:
+      - generic [ref=e61]:
+        - generic [ref=e67]:
+          - generic:
+            - img
+          - textbox "People. Places. Things." [active] [ref=e68]
+        - main [ref=e69]:
+          - generic [ref=e71]:
+            - generic [ref=e74]:
+              - link "View details" [ref=e75] [cursor=pointer]:
+                - /url: /askdigg/fv3vEnH/what-do-you-like-the-most
+              - article [ref=e76]:
+                - generic [ref=e77]:
+                  - link "Community Avatar / askdigg" [ref=e79] [cursor=pointer]:
+                    - /url: /askdigg
+                    - generic [ref=e81]:
+                      - img "Community Avatar" [ref=e83]
+                      - generic [ref=e84]: /
+                      - generic [ref=e85]: askdigg
+                  - generic [ref=e86]: 3h
+                - link "What do you like the most so far about Digg? For me apart from obviously being alternative to reddit which now went 100% profit harvesting, full facebook style enshittification its AI generated articles TLDR under links to articles. It's really helpful!" [ref=e87] [cursor=pointer]:
+                  - /url: /askdigg/fv3vEnH/what-do-you-like-the-most
+                  - generic [ref=e88]:
+                    - heading "What do you like the most so far about Digg?" [level=3] [ref=e89]
+                    - paragraph [ref=e90]: For me apart from obviously being alternative to reddit which now went 100% profit harvesting, full facebook style enshittification its AI generated articles TLDR under links to articles. It's really helpful!
+                - generic [ref=e91]:
+                  - generic [ref=e92]:
+                    - group "Vote on post" [ref=e93]:
+                      - button "Digg this post" [ref=e94] [cursor=pointer]:
+                        - generic [ref=e95]:
+                          - generic [ref=e96]:
+                            - img [ref=e97]
+                            - img [ref=e99]
+                          - img [ref=e101]
+                          - img [ref=e108]
+                      - generic "45 diggs" [ref=e110]: "45"
+                      - generic [ref=e111]: "Score: 45"
+                      - button "Bury" [ref=e112] [cursor=pointer]:
+                        - generic [ref=e113]:
+                          - img [ref=e114]
+                          - generic [ref=e117]:
+                            - img [ref=e118]
+                            - img [ref=e120]
+                    - link "25" [ref=e122] [cursor=pointer]:
+                      - /url: /askdigg/fv3vEnH/what-do-you-like-the-most#comments
+                      - img [ref=e123]
+                      - generic [ref=e125]: "25"
+                  - generic [ref=e126]:
+                    - button "Share" [ref=e127] [cursor=pointer]:
+                      - img [ref=e128]
+                    - button "Open menu" [ref=e131] [cursor=pointer]:
+                      - img [ref=e132]
+                      - generic [ref=e134]: Open menu
+            - generic [ref=e137]:
+              - link "View details" [ref=e138] [cursor=pointer]:
+                - /url: /technology/r9jSX9O/anthropic-just-published-the-most-important
+              - article [ref=e139]:
+                - generic [ref=e140]:
+                  - link "Community Avatar / technology" [ref=e142] [cursor=pointer]:
+                    - /url: /technology
+                    - generic [ref=e144]:
+                      - img "Community Avatar" [ref=e146]
+                      - generic [ref=e147]: /
+                      - generic [ref=e148]: technology
+                  - generic [ref=e149]: 3h
+                - generic [ref=e150]:
+                  - link "Anthropic just published the most important study on AI and jobs. The researchers call it a \"Great Recession for white-collar workers.\" It maps out EXACTLY which jobs AI is actively performing right now vs. which ones it COULD perform." [ref=e151] [cursor=pointer]:
+                    - /url: /technology/r9jSX9O/anthropic-just-published-the-most-important
+                    - heading "Anthropic just published the most important study on AI and jobs. The researchers call it a \"Great Recession for white-collar workers.\" It maps out EXACTLY which jobs AI is actively performing right now vs. which ones it COULD perform." [level=3] [ref=e153]
+                  - button "View image in lightbox" [ref=e154] [cursor=pointer]
+                - generic [ref=e155]:
+                  - generic [ref=e156]:
+                    - group "Vote on post" [ref=e157]:
+                      - button "Digg this post" [ref=e158] [cursor=pointer]:
+                        - generic [ref=e159]:
+                          - generic [ref=e160]:
+                            - img [ref=e161]
+                            - img [ref=e163]
+                          - img [ref=e165]
+                          - img [ref=e172]
+                      - generic "38 diggs" [ref=e174]: "38"
+                      - generic [ref=e175]: "Score: 38"
+                      - button "Bury" [ref=e176] [cursor=pointer]:
+                        - generic [ref=e177]:
+                          - img [ref=e178]
+                          - generic [ref=e181]:
+                            - img [ref=e182]
+                            - img [ref=e184]
+                    - link "14" [ref=e186] [cursor=pointer]:
+                      - /url: /technology/r9jSX9O/anthropic-just-published-the-most-important#comments
+                      - img [ref=e187]
+                      - generic [ref=e189]: "14"
+                  - generic [ref=e190]:
+                    - button "Share" [ref=e191] [cursor=pointer]:
+                      - img [ref=e192]
+                    - button "Open menu" [ref=e195] [cursor=pointer]:
+                      - img [ref=e196]
+                      - generic [ref=e198]: Open menu
+            - generic [ref=e201]:
+              - link "View details" [ref=e202] [cursor=pointer]:
+                - /url: /books/DI9cNn1/reading
+              - article [ref=e203]:
+                - generic [ref=e204]:
+                  - link "Community Avatar / books" [ref=e206] [cursor=pointer]:
+                    - /url: /books
+                    - generic [ref=e208]:
+                      - img "Community Avatar" [ref=e210]
+                      - generic [ref=e211]: /
+                      - generic [ref=e212]: books
+                  - generic [ref=e213]: 5h
+                - link "Reading Hey guys what’s your favorite book to read? Mine as a kid was Coraline. But right now I don’t have a favorite book." [ref=e214] [cursor=pointer]:
+                  - /url: /books/DI9cNn1/reading
+                  - generic [ref=e215]:
+                    - heading "Reading" [level=3] [ref=e216]
+                    - paragraph [ref=e217]: Hey guys what’s your favorite book to read? Mine as a kid was Coraline. But right now I don’t have a favorite book.
+                - generic [ref=e218]:
+                  - generic [ref=e219]:
+                    - group "Vote on post" [ref=e220]:
+                      - button "Digg this post" [ref=e221] [cursor=pointer]:
+                        - generic [ref=e222]:
+                          - generic [ref=e223]:
+                            - img [ref=e224]
+                            - img [ref=e226]
+                          - img [ref=e228]
+                          - img [ref=e235]
+                      - generic "35 diggs" [ref=e237]: "35"
+                      - generic [ref=e238]: "Score: 35"
+                      - button "Bury" [ref=e239] [cursor=pointer]:
+                        - generic [ref=e240]:
+                          - img [ref=e241]
+                          - generic [ref=e244]:
+                            - img [ref=e245]
+                            - img [ref=e247]
+                    - link "8" [ref=e249] [cursor=pointer]:
+                      - /url: /books/DI9cNn1/reading#comments
+                      - img [ref=e250]
+                      - generic [ref=e252]: "8"
+                  - generic [ref=e253]:
+                    - button "Share" [ref=e254] [cursor=pointer]:
+                      - img [ref=e255]
+                    - button "Open menu" [ref=e258] [cursor=pointer]:
+                      - img [ref=e259]
+                      - generic [ref=e261]: Open menu
+            - generic [ref=e264]:
+              - link "View details" [ref=e265] [cursor=pointer]:
+                - /url: /movies/gNllqjr/the-bride-opens-to-73m-domestically
+              - article [ref=e266]:
+                - generic [ref=e267]:
+                  - link "Community Avatar / movies" [ref=e269] [cursor=pointer]:
+                    - /url: /movies
+                    - generic [ref=e271]:
+                      - img "Community Avatar" [ref=e273]
+                      - generic [ref=e274]: /
+                      - generic [ref=e275]: movies
+                  - generic [ref=e276]: 5h
+                - generic [ref=e277]:
+                  - link "‘The Bride!’ opens to $7.3M domestically – expected to be a box office bomb with a $90M budget This review of Maggie Gyllenhaal's 'The Bride!' discusses how the film attempts to reimagine the classic 'Bride of Frankenstein' story with a feminist twist, but ultimately falls short due to its disjointed narrative and shallow exploration of its themes." [ref=e279] [cursor=pointer]:
+                    - /url: /movies/gNllqjr/the-bride-opens-to-73m-domestically
+                    - generic [ref=e280]:
+                      - heading "‘The Bride!’ opens to $7.3M domestically – expected to be a box office bomb with a $90M budget" [level=3] [ref=e281]
+                      - paragraph [ref=e282]: This review of Maggie Gyllenhaal's 'The Bride!' discusses how the film attempts to reimagine the classic 'Bride of Frankenstein' story with a feminist twist, but ultimately falls short due to its disjointed narrative and shallow exploration of its themes.
+                  - complementary [ref=e283]:
+                    - link "‘The Bride!’ Review – Jessie Buckley and Christian Bale Can’t Save a Frankenstein-Like Mess - Featured Image discussingfilm.net" [ref=e285] [cursor=pointer]:
+                      - /url: https://discussingfilm.net/2026/03/04/the-bride-review-maggie-gyllenhaal/
+                      - img "‘The Bride!’ Review – Jessie Buckley and Christian Bale Can’t Save a Frankenstein-Like Mess - Featured Image" [ref=e286]
+                      - generic [ref=e288]: discussingfilm.net
+                - generic [ref=e289]:
+                  - generic [ref=e290]:
+                    - group "Vote on post" [ref=e291]:
+                      - button "Digg this post" [ref=e292] [cursor=pointer]:
+                        - generic [ref=e293]:
+                          - generic [ref=e294]:
+                            - img [ref=e295]
+                            - img [ref=e297]
+                          - img [ref=e299]
+                          - img [ref=e306]
+                      - generic "36 diggs" [ref=e308]: "36"
+                      - generic [ref=e309]: "Score: 36"
+                      - button "Bury" [ref=e310] [cursor=pointer]:
+                        - generic [ref=e311]:
+                          - img [ref=e312]
+                          - generic [ref=e315]:
+                            - img [ref=e316]
+                            - img [ref=e318]
+                    - link "7" [ref=e320] [cursor=pointer]:
+                      - /url: /movies/gNllqjr/the-bride-opens-to-73m-domestically#comments
+                      - img [ref=e321]
+                      - generic [ref=e323]: "7"
+                  - generic [ref=e324]:
+                    - button "Share" [ref=e325] [cursor=pointer]:
+                      - img [ref=e326]
+                    - button "Open menu" [ref=e329] [cursor=pointer]:
+                      - img [ref=e330]
+                      - generic [ref=e332]: Open menu
+            - generic [ref=e335]:
+              - link "View details" [ref=e336] [cursor=pointer]:
+                - /url: /wildlife/k69vcsv/tiny-possum-and-glider-thought-extinct
+              - article [ref=e337]:
+                - generic [ref=e338]:
+                  - link "Community Avatar / wildlife" [ref=e340] [cursor=pointer]:
+                    - /url: /wildlife
+                    - generic [ref=e342]:
+                      - img "Community Avatar" [ref=e344]
+                      - generic [ref=e345]: /
+                      - generic [ref=e346]: wildlife
+                  - generic [ref=e347]: 2h
+                - generic [ref=e348]:
+                  - link "Tiny possum and glider thought extinct for 6,000 years found in remote West Papua The first rediscovered species was the pygmy long-fingered possum, a striped marsupial weighing about 200g, which is understood to have vanished from Australia during the Ice Age. A distinguishing feature is that on each hand, the possum's fourth finger is twice the length of oth" [ref=e350] [cursor=pointer]:
+                    - /url: /wildlife/k69vcsv/tiny-possum-and-glider-thought-extinct
+                    - generic [ref=e351]:
+                      - heading "Tiny possum and glider thought extinct for 6,000 years found in remote West Papua" [level=3] [ref=e352]
+                      - paragraph [ref=e353]: The first rediscovered species was the pygmy long-fingered possum, a striped marsupial weighing about 200g, which is understood to have vanished from Australia during the Ice Age. A distinguishing feature is that on each hand, the possum's fourth finger is twice the length of oth
+                  - complementary [ref=e354]:
+                    - link "Tiny possum and glider thought extinct for 6,000 years found in remote West Papua - Featured Image bbc.com" [ref=e356] [cursor=pointer]:
+                      - /url: https://www.bbc.com/news/articles/cp814l80pw2o
+                      - img "Tiny possum and glider thought extinct for 6,000 years found in remote West Papua - Featured Image" [ref=e357]
+                      - generic [ref=e359]: bbc.com
+                - generic [ref=e360]:
+                  - generic [ref=e361]:
+                    - group "Vote on post" [ref=e362]:
+                      - button "Digg this post" [ref=e363] [cursor=pointer]:
+                        - generic [ref=e364]:
+                          - generic [ref=e365]:
+                            - img [ref=e366]
+                            - img [ref=e368]
+                          - img [ref=e370]
+                          - img [ref=e377]
+                      - generic "15 diggs" [ref=e379]: "15"
+                      - generic [ref=e380]: "Score: 15"
+                      - button "Bury" [ref=e381] [cursor=pointer]:
+                        - generic [ref=e382]:
+                          - img [ref=e383]
+                          - generic [ref=e386]:
+                            - img [ref=e387]
+                            - img [ref=e389]
+                    - link "2" [ref=e391] [cursor=pointer]:
+                      - /url: /wildlife/k69vcsv/tiny-possum-and-glider-thought-extinct#comments
+                      - img [ref=e392]
+                      - generic [ref=e394]: "2"
+                  - generic [ref=e395]:
+                    - button "Share" [ref=e396] [cursor=pointer]:
+                      - img [ref=e397]
+                    - button "Open menu" [ref=e400] [cursor=pointer]:
+                      - img [ref=e401]
+                      - generic [ref=e403]: Open menu
+            - generic [ref=e406]:
+              - link "View details" [ref=e407] [cursor=pointer]:
+                - /url: /digg/OFMkntw/is-this-an-acceptable-way-to
+              - article [ref=e408]:
+                - generic [ref=e409]:
+                  - link "Community Avatar / digg" [ref=e411] [cursor=pointer]:
+                    - /url: /digg
+                    - generic [ref=e413]:
+                      - img "Community Avatar" [ref=e415]
+                      - generic [ref=e416]: /
+                      - generic [ref=e417]: digg
+                  - generic [ref=e418]: 1h
+                - generic [ref=e419]:
+                  - link "Is this an acceptable way to run a community? So basically this person alters headlines to call the USA, Israel and others terrorists and celebrates them being killed but removes any posts that points the finger at actual designated terrorist groups. I would appreciate some clarification from a developer as to just how mu" [ref=e420] [cursor=pointer]:
+                    - /url: /digg/OFMkntw/is-this-an-acceptable-way-to
+                    - generic [ref=e421]:
+                      - heading "Is this an acceptable way to run a community?" [level=3] [ref=e422]
+                      - paragraph [ref=e423]: So basically this person alters headlines to call the USA, Israel and others terrorists and celebrates them being killed but removes any posts that points the finger at actual designated terrorist groups. I would appreciate some clarification from a developer as to just how mu
+                  - button "View image in lightbox" [ref=e424] [cursor=pointer]:
+                    - img [ref=e426]
+                - generic [ref=e430]:
+                  - generic [ref=e431]:
+                    - group "Vote on post" [ref=e432]:
+                      - button "Digg this post" [ref=e433] [cursor=pointer]:
+                        - generic [ref=e434]:
+                          - generic [ref=e435]:
+                            - img [ref=e436]
+                            - img [ref=e438]
+                          - img [ref=e440]
+                          - img [ref=e447]
+                      - generic "11 diggs" [ref=e449]: "11"
+                      - generic [ref=e450]: "Score: 11"
+                      - button "Bury" [ref=e451] [cursor=pointer]:
+                        - generic [ref=e452]:
+                          - img [ref=e453]
+                          - generic [ref=e456]:
+                            - img [ref=e457]
+                            - img [ref=e459]
+                    - link "12" [ref=e461] [cursor=pointer]:
+                      - /url: /digg/OFMkntw/is-this-an-acceptable-way-to#comments
+                      - img [ref=e462]
+                      - generic [ref=e464]: "12"
+                  - generic [ref=e465]:
+                    - button "Share" [ref=e466] [cursor=pointer]:
+                      - img [ref=e467]
+                    - button "Open menu" [ref=e470] [cursor=pointer]:
+                      - img [ref=e471]
+                      - generic [ref=e473]: Open menu
+            - generic [ref=e476]:
+              - link "View details" [ref=e477] [cursor=pointer]:
+                - /url: /wildlife/CcOR2Ss/just-thoughtful-or-really-blue
+              - article [ref=e478]:
+                - generic [ref=e479]:
+                  - link "Community Avatar / wildlife" [ref=e481] [cursor=pointer]:
+                    - /url: /wildlife
+                    - generic [ref=e483]:
+                      - img "Community Avatar" [ref=e485]
+                      - generic [ref=e486]: /
+                      - generic [ref=e487]: wildlife
+                  - generic [ref=e488]: 3h
+                - generic [ref=e489]:
+                  - link "Just thoughtful or really blue? This pair of blue monkeys (Cercopithecus mitis) native to central and East Africa look pensive to say the least. It is unlikely that they are wondering why we have named them “blue” when in fact they have a slaty-grey cast that sometimes – just sometimes – can look blue to obser" [ref=e490] [cursor=pointer]:
+                    - /url: /wildlife/CcOR2Ss/just-thoughtful-or-really-blue
+                    - generic [ref=e491]:
+                      - heading "Just thoughtful or really blue?" [level=3] [ref=e492]
+                      - paragraph [ref=e493]: This pair of blue monkeys (Cercopithecus mitis) native to central and East Africa look pensive to say the least. It is unlikely that they are wondering why we have named them “blue” when in fact they have a slaty-grey cast that sometimes – just sometimes – can look blue to obser
+                  - button "View image in lightbox" [ref=e494] [cursor=pointer]
+                - generic [ref=e495]:
+                  - generic [ref=e496]:
+                    - group "Vote on post" [ref=e497]:
+                      - button "Digg this post" [ref=e498] [cursor=pointer]:
+                        - generic [ref=e499]:
+                          - generic [ref=e500]:
+                            - img [ref=e501]
+                            - img [ref=e503]
+                          - img [ref=e505]
+                          - img [ref=e512]
+                      - generic "28 diggs" [ref=e514]: "28"
+                      - generic [ref=e515]: "Score: 28"
+                      - button "Bury" [ref=e516] [cursor=pointer]:
+                        - generic [ref=e517]:
+                          - img [ref=e518]
+                          - generic [ref=e521]:
+                            - img [ref=e522]
+                            - img [ref=e524]
+                    - link "1" [ref=e526] [cursor=pointer]:
+                      - /url: /wildlife/CcOR2Ss/just-thoughtful-or-really-blue#comments
+                      - img [ref=e527]
+                      - generic [ref=e529]: "1"
+                  - generic [ref=e530]:
+                    - button "Share" [ref=e531] [cursor=pointer]:
+                      - img [ref=e532]
+                    - button "Open menu" [ref=e535] [cursor=pointer]:
+                      - img [ref=e536]
+                      - generic [ref=e538]: Open menu
+            - generic [ref=e541]:
+              - link "View details" [ref=e542] [cursor=pointer]:
+                - /url: /dankmemes/xekUbeG/fight-club
+              - article [ref=e543]:
+                - generic [ref=e544]:
+                  - link "Community Avatar / dankmemes" [ref=e546] [cursor=pointer]:
+                    - /url: /dankmemes
+                    - generic [ref=e548]:
+                      - img "Community Avatar" [ref=e550]
+                      - generic [ref=e551]: /
+                      - generic [ref=e552]: dankmemes
+                  - generic [ref=e553]: 4h
+                - generic [ref=e554]:
+                  - link "Fight club" [ref=e555] [cursor=pointer]:
+                    - /url: /dankmemes/xekUbeG/fight-club
+                    - heading "Fight club" [level=3] [ref=e557]
+                  - button "View image in lightbox" [ref=e558] [cursor=pointer]:
+                    - img "Post - Image" [ref=e559]
+                - generic [ref=e560]:
+                  - generic [ref=e561]:
+                    - group "Vote on post" [ref=e562]:
+                      - button "Digg this post" [ref=e563] [cursor=pointer]:
+                        - generic [ref=e564]:
+                          - generic [ref=e565]:
+                            - img [ref=e566]
+                            - img [ref=e568]
+                          - img [ref=e570]
+                          - img [ref=e577]
+                      - generic "27 diggs" [ref=e579]: "27"
+                      - generic [ref=e580]: "Score: 27"
+                      - button "Bury" [ref=e581] [cursor=pointer]:
+                        - generic [ref=e582]:
+                          - img [ref=e583]
+                          - generic [ref=e586]:
+                            - img [ref=e587]
+                            - img [ref=e589]
+                    - link "2" [ref=e591] [cursor=pointer]:
+                      - /url: /dankmemes/xekUbeG/fight-club#comments
+                      - img [ref=e592]
+                      - generic [ref=e594]: "2"
+                  - generic [ref=e595]:
+                    - button "Share" [ref=e596] [cursor=pointer]:
+                      - img [ref=e597]
+                    - button "Open menu" [ref=e600] [cursor=pointer]:
+                      - img [ref=e601]
+                      - generic [ref=e603]: Open menu
+            - generic [ref=e606]:
+              - link "View details" [ref=e607] [cursor=pointer]:
+                - /url: /music/NChiwqx/david-byrne-st-vincent-who
+              - article [ref=e608]:
+                - generic [ref=e609]:
+                  - link "Community Avatar / music" [ref=e611] [cursor=pointer]:
+                    - /url: /music
+                    - generic [ref=e613]:
+                      - img "Community Avatar" [ref=e615]
+                      - generic [ref=e616]: /
+                      - generic [ref=e617]: music
+                  - generic [ref=e618]: 4h
+                - generic [ref=e619]:
+                  - link "David Byrne & St. Vincent - Who The first video from David Byrne & St. Vincent's collaborative album \"Love This Giant\". St. Vincent was actually the last concert I went to before covid hit. She's the best! Still have never seen David Byrne in concert, maybe someday." [ref=e621] [cursor=pointer]:
+                    - /url: /music/NChiwqx/david-byrne-st-vincent-who
+                    - generic [ref=e622]:
+                      - heading "David Byrne & St. Vincent - Who" [level=3] [ref=e623]
+                      - paragraph [ref=e624]: The first video from David Byrne & St. Vincent's collaborative album "Love This Giant". St. Vincent was actually the last concert I went to before covid hit. She's the best! Still have never seen David Byrne in concert, maybe someday.
+                  - complementary [ref=e625]:
+                    - link "David Byrne & St. Vincent - Who (Official Video) - Featured Image youtube.com" [ref=e627] [cursor=pointer]:
+                      - /url: https://www.youtube.com/watch?v=hpPYKJAnwUo
+                      - img "David Byrne & St. Vincent - Who (Official Video) - Featured Image" [ref=e628]
+                      - generic [ref=e630]: youtube.com
+                - generic [ref=e631]:
+                  - generic [ref=e632]:
+                    - group "Vote on post" [ref=e633]:
+                      - button "Digg this post" [ref=e634] [cursor=pointer]:
+                        - generic [ref=e635]:
+                          - generic [ref=e636]:
+                            - img [ref=e637]
+                            - img [ref=e639]
+                          - img [ref=e641]
+                          - img [ref=e648]
+                      - generic "33 diggs" [ref=e650]: "33"
+                      - generic [ref=e651]: "Score: 33"
+                      - button "Bury" [ref=e652] [cursor=pointer]:
+                        - generic [ref=e653]:
+                          - img [ref=e654]
+                          - generic [ref=e657]:
+                            - img [ref=e658]
+                            - img [ref=e660]
+                    - link "3" [ref=e662] [cursor=pointer]:
+                      - /url: /music/NChiwqx/david-byrne-st-vincent-who#comments
+                      - img [ref=e663]
+                      - generic [ref=e665]: "3"
+                  - generic [ref=e666]:
+                    - button "Share" [ref=e667] [cursor=pointer]:
+                      - img [ref=e668]
+                    - button "Open menu" [ref=e671] [cursor=pointer]:
+                      - img [ref=e672]
+                      - generic [ref=e674]: Open menu
+            - generic [ref=e677]:
+              - link "View details" [ref=e678] [cursor=pointer]:
+                - /url: /digg/Ujl1nhm/active-this-week-panel-is-featuring
+              - article [ref=e679]:
+                - generic [ref=e680]:
+                  - link "Community Avatar / digg" [ref=e682] [cursor=pointer]:
+                    - /url: /digg
+                    - generic [ref=e684]:
+                      - img "Community Avatar" [ref=e686]
+                      - generic [ref=e687]: /
+                      - generic [ref=e688]: digg
+                  - generic [ref=e689]: 7h
+                - 'link "\"Active this week\" panel is featuring obviously fishy communities I mean go check out /coin which is #3 right now. A single scintillating post where somebody posted \"coin\" and then replied to himself with \"coin\". Then 1,158 ghost posts. And nothing in the ledger! I think it''s funny but I don''t think it helps communicate to new users that this i" [ref=e690] [cursor=pointer]':
+                  - /url: /digg/Ujl1nhm/active-this-week-panel-is-featuring
+                  - generic [ref=e691]:
+                    - heading "\"Active this week\" panel is featuring obviously fishy communities" [level=3] [ref=e692]
+                    - paragraph [ref=e693]: "I mean go check out /coin which is #3 right now. A single scintillating post where somebody posted \"coin\" and then replied to himself with \"coin\". Then 1,158 ghost posts. And nothing in the ledger! I think it's funny but I don't think it helps communicate to new users that this i"
+                - generic [ref=e694]:
+                  - generic [ref=e695]:
+                    - group "Vote on post" [ref=e696]:
+                      - button "Digg this post" [ref=e697] [cursor=pointer]:
+                        - generic [ref=e698]:
+                          - generic [ref=e699]:
+                            - img [ref=e700]
+                            - img [ref=e702]
+                          - img [ref=e704]
+                          - img [ref=e711]
+                      - generic "59 diggs" [ref=e713]: "59"
+                      - generic [ref=e714]: "Score: 59"
+                      - button "Bury" [ref=e715] [cursor=pointer]:
+                        - generic [ref=e716]:
+                          - img [ref=e717]
+                          - generic [ref=e720]:
+                            - img [ref=e721]
+                            - img [ref=e723]
+                    - link "9" [ref=e725] [cursor=pointer]:
+                      - /url: /digg/Ujl1nhm/active-this-week-panel-is-featuring#comments
+                      - img [ref=e726]
+                      - generic [ref=e728]: "9"
+                  - generic [ref=e729]:
+                    - button "Share" [ref=e730] [cursor=pointer]:
+                      - img [ref=e731]
+                    - button "Open menu" [ref=e734] [cursor=pointer]:
+                      - img [ref=e735]
+                      - generic [ref=e737]: Open menu
+            - generic [ref=e740]:
+              - link "View details" [ref=e741] [cursor=pointer]:
+                - /url: /apple/pofa8QA/apple-planning-macbook-ultra-with-touchscreen
+              - article [ref=e742]:
+                - generic [ref=e743]:
+                  - link "Community Avatar / apple" [ref=e745] [cursor=pointer]:
+                    - /url: /apple
+                    - generic [ref=e747]:
+                      - img "Community Avatar" [ref=e749]
+                      - generic [ref=e750]: /
+                      - generic [ref=e751]: apple
+                  - generic [ref=e752]: 7h
+                - generic [ref=e753]:
+                  - link "Apple Planning 'MacBook Ultra' With Touchscreen and Higher Price Apple is planning to launch a new MacBook Ultra model this year, featuring an OLED display, touchscreen, and a higher price point, according to Bloomberg's Mark Gurman. Gurman suggests that the MacBook Ultra will be a new, top-tier laptop rather than a MacBook Pro, sitting above the current M5 MacBook Pros and enabling a higher price point. The device is expected to launch around the end of the year." [ref=e755] [cursor=pointer]:
+                    - /url: /apple/pofa8QA/apple-planning-macbook-ultra-with-touchscreen
+                    - generic [ref=e756]:
+                      - heading "Apple Planning 'MacBook Ultra' With Touchscreen and Higher Price" [level=3] [ref=e757]
+                      - paragraph [ref=e758]: Apple is planning to launch a new MacBook Ultra model this year, featuring an OLED display, touchscreen, and a higher price point, according to Bloomberg's Mark Gurman. Gurman suggests that the MacBook Ultra will be a new, top-tier laptop rather than a MacBook Pro, sitting above the current M5 MacBook Pros and enabling a higher price point. The device is expected to launch around the end of the year.
+                  - complementary [ref=e759]:
+                    - link "Apple Planning 'MacBook Ultra' With Touchscreen and Higher Price - MacRumors - Featured Image macrumors.com" [ref=e761] [cursor=pointer]:
+                      - /url: https://www.macrumors.com/2026/03/08/apple-planning-macbook-ultra/
+                      - img "Apple Planning 'MacBook Ultra' With Touchscreen and Higher Price - MacRumors - Featured Image" [ref=e762]
+                      - generic [ref=e764]: macrumors.com
+                - generic [ref=e765]:
+                  - generic [ref=e766]:
+                    - group "Vote on post" [ref=e767]:
+                      - button "Digg this post" [ref=e768] [cursor=pointer]:
+                        - generic [ref=e769]:
+                          - generic [ref=e770]:
+                            - img [ref=e771]
+                            - img [ref=e773]
+                          - img [ref=e775]
+                          - img [ref=e782]
+                      - generic "35 diggs" [ref=e784]: "35"
+                      - generic [ref=e785]: "Score: 35"
+                      - button "Bury" [ref=e786] [cursor=pointer]:
+                        - generic [ref=e787]:
+                          - img [ref=e788]
+                          - generic [ref=e791]:
+                            - img [ref=e792]
+                            - img [ref=e794]
+                    - link "5" [ref=e796] [cursor=pointer]:
+                      - /url: /apple/pofa8QA/apple-planning-macbook-ultra-with-touchscreen#comments
+                      - img [ref=e797]
+                      - generic [ref=e799]: "5"
+                  - generic [ref=e800]:
+                    - button "Share" [ref=e801] [cursor=pointer]:
+                      - img [ref=e802]
+                    - button "Open menu" [ref=e805] [cursor=pointer]:
+                      - img [ref=e806]
+                      - generic [ref=e808]: Open menu
+            - generic [ref=e811]:
+              - link "View details" [ref=e812] [cursor=pointer]:
+                - /url: /gaming/fOuGKC9/microsoft-patents-system-for-ai-helpers
+              - article [ref=e813]:
+                - generic [ref=e814]:
+                  - link "Community Avatar / gaming" [ref=e816] [cursor=pointer]:
+                    - /url: /gaming
+                    - generic [ref=e818]:
+                      - img "Community Avatar" [ref=e820]
+                      - generic [ref=e821]: /
+                      - generic [ref=e822]: gaming
+                  - generic [ref=e823]: 6h
+                - generic [ref=e824]:
+                  - link "Microsoft patents system for AI helpers to finish games for you Microsoft has patented a system for Xbox that could summon human or AI 'helpers' to take over difficult parts of games. The system would offer a 'cloud-based help session' during play, pulling a 'help session starting state' from the player's save and streaming the session to a helper's device. The helper would then send inputs back, and the system could provide the updated help session state to the current gaming session. The patent includes examples such as racing games and adventure games, and it also lays the groundwork for AI helpers." [ref=e826] [cursor=pointer]:
+                    - /url: /gaming/fOuGKC9/microsoft-patents-system-for-ai-helpers
+                    - generic [ref=e827]:
+                      - heading "Microsoft patents system for AI helpers to finish games for you" [level=3] [ref=e828]
+                      - paragraph [ref=e829]: Microsoft has patented a system for Xbox that could summon human or AI 'helpers' to take over difficult parts of games. The system would offer a 'cloud-based help session' during play, pulling a 'help session starting state' from the player's save and streaming the session to a helper's device. The helper would then send inputs back, and the system could provide the updated help session state to the current gaming session. The patent includes examples such as racing games and adventure games, and it also lays the groundwork for AI helpers.
+                  - complementary [ref=e830]:
+                    - link "Microsoft patents system for AI helpers to finish games for you - Dexerto - Featured Image dexerto.com" [ref=e832] [cursor=pointer]:
+                      - /url: https://www.dexerto.com/gaming/microsoft-patents-system-for-ai-helpers-to-finish-games-for-you-3328275/
+                      - img "Microsoft patents system for AI helpers to finish games for you - Dexerto - Featured Image" [ref=e833]
+                      - generic [ref=e835]: dexerto.com
+                - generic [ref=e836]:
+                  - generic [ref=e837]:
+                    - group "Vote on post" [ref=e838]:
+                      - button "Digg this post" [ref=e839] [cursor=pointer]:
+                        - generic [ref=e840]:
+                          - generic [ref=e841]:
+                            - img [ref=e842]
+                            - img [ref=e844]
+                          - img [ref=e846]
+                          - img [ref=e853]
+                      - generic "40 diggs" [ref=e855]: "40"
+                      - generic [ref=e856]: "Score: 40"
+                      - button "Bury" [ref=e857] [cursor=pointer]:
+                        - generic [ref=e858]:
+                          - img [ref=e859]
+                          - generic [ref=e862]:
+                            - img [ref=e863]
+                            - img [ref=e865]
+                    - link "8" [ref=e867] [cursor=pointer]:
+                      - /url: /gaming/fOuGKC9/microsoft-patents-system-for-ai-helpers#comments
+                      - img [ref=e868]
+                      - generic [ref=e870]: "8"
+                  - generic [ref=e871]:
+                    - button "Share" [ref=e872] [cursor=pointer]:
+                      - img [ref=e873]
+                    - button "Open menu" [ref=e876] [cursor=pointer]:
+                      - img [ref=e877]
+                      - generic [ref=e879]: Open menu
+      - complementary [ref=e880]:
+        - generic [ref=e883]:
+          - article [ref=e884]:
+            - generic [ref=e885]:
+              - img "Digg Daily highlight image" [ref=e886]
+              - generic [ref=e887]:
+                - paragraph [ref=e888]: Digg Daily
+                - paragraph [ref=e889]: Mar 6, 2026
+            - generic [ref=e890]:
+              - slider "Audio playback position" [ref=e892] [cursor=pointer]
+              - generic [ref=e893]:
+                - generic [ref=e894]: 0:00
+                - generic [ref=e895]: 4:49
+            - generic [ref=e896]:
+              - generic [ref=e897]:
+                - button "Skip to previous chapter" [disabled]:
+                  - img
+                  - generic: Skip to previous chapter
+                - button "Play audio in podcast player" [ref=e898] [cursor=pointer]:
+                  - img [ref=e899]
+                  - generic [ref=e901]: Play audio in podcast player
+                - button "Skip to next chapter" [ref=e902] [cursor=pointer]:
+                  - img [ref=e903]
+                  - generic [ref=e905]: Skip to next chapter
+              - button "Chapters" [ref=e906] [cursor=pointer]:
+                - img [ref=e907]
+                - generic [ref=e910]: Chapters
+          - generic [ref=e911]:
+            - link "Discover Communities" [ref=e912] [cursor=pointer]:
+              - /url: /d/discover/communities
+              - heading "Discover Communities" [level=4] [ref=e913]
+              - img [ref=e914]
+            - generic [ref=e916]:
+              - link "Community Avatar Join / movieposters 241 members 146 posts" [ref=e917] [cursor=pointer]:
+                - /url: /movieposters
+                - generic [ref=e918]:
+                  - img "Community Avatar" [ref=e920]
+                  - button "Join" [ref=e921]:
+                    - img [ref=e922]
+                    - generic [ref=e924]: Join
+                - generic [ref=e925]:
+                  - generic [ref=e926]:
+                    - generic [ref=e927]: /
+                    - generic [ref=e928]: movieposters
+                  - generic [ref=e929]:
+                    - generic [ref=e930]: 241 members
+                    - generic [ref=e931]: 146 posts
+              - link "Community Avatar Join / nopolitics 270 members 253 posts" [ref=e932] [cursor=pointer]:
+                - /url: /nopolitics
+                - generic [ref=e933]:
+                  - img "Community Avatar" [ref=e935]
+                  - button "Join" [ref=e936]:
+                    - img [ref=e937]
+                    - generic [ref=e939]: Join
+                - generic [ref=e940]:
+                  - generic [ref=e941]:
+                    - generic [ref=e942]: /
+                    - generic [ref=e943]: nopolitics
+                  - generic [ref=e944]:
+                    - generic [ref=e945]: 270 members
+                    - generic [ref=e946]: 253 posts
+              - link "Community Avatar Join / oddlysatisfying 286 members 47 posts" [ref=e947] [cursor=pointer]:
+                - /url: /oddlysatisfying
+                - generic [ref=e948]:
+                  - img "Community Avatar" [ref=e950]
+                  - button "Join" [ref=e951]:
+                    - img [ref=e952]
+                    - generic [ref=e954]: Join
+                - generic [ref=e955]:
+                  - generic [ref=e956]:
+                    - generic [ref=e957]: /
+                    - generic [ref=e958]: oddlysatisfying
+                  - generic [ref=e959]:
+                    - generic [ref=e960]: 286 members
+                    - generic [ref=e961]: 47 posts
+          - generic [ref=e962]:
+            - heading "Featured Posts" [level=4] [ref=e963]
+            - generic [ref=e964]:
+              - article [ref=e965]:
+                - link "View details" [ref=e966] [cursor=pointer]:
+                  - /url: /technology/khgI7qm/evidence-grows-that-googles-ai-overviews
+                - generic [ref=e967]:
+                  - generic [ref=e968]: Trending
+                  - generic [ref=e969]: 20h
+                - generic [ref=e970]:
+                  - generic [ref=e971]:
+                    - paragraph [ref=e972]: Evidence Grows That Google’s AI Overviews Have Eviscerated the Media Industry
+                    - generic [ref=e973]:
+                      - generic [ref=e974]:
+                        - img [ref=e975]
+                        - generic [ref=e977]: "117"
+                      - generic [ref=e978]:
+                        - img [ref=e979]
+                        - generic [ref=e981]: "24"
+                  - link [ref=e982] [cursor=pointer]:
+                    - /url: /technology/khgI7qm/evidence-grows-that-googles-ai-overviews
+                    - complementary [ref=e983]:
+                      - img "Evidence Grows That Google’s AI Overviews Have Eviscerated the Media Industry - Featured Image" [ref=e984]
+                      - img [ref=e986]
+              - article [ref=e989]:
+                - link "View details" [ref=e990] [cursor=pointer]:
+                  - /url: /science/wI3Mcid/scientists-finally-found-something-tardigrades-cant
+                - generic [ref=e991]:
+                  - generic [ref=e992]: Trending
+                  - generic [ref=e993]: 1d
+                - generic [ref=e994]:
+                  - generic [ref=e995]:
+                    - paragraph [ref=e996]: Scientists Finally Found Something Tardigrades Can’t Survive
+                    - generic [ref=e997]:
+                      - generic [ref=e998]:
+                        - img [ref=e999]
+                        - generic [ref=e1001]: "92"
+                      - generic [ref=e1002]:
+                        - img [ref=e1003]
+                        - generic [ref=e1005]: "11"
+                  - link [ref=e1006] [cursor=pointer]:
+                    - /url: /science/wI3Mcid/scientists-finally-found-something-tardigrades-cant
+                    - complementary [ref=e1007]:
+                      - img "Scientists Finally Found Something Tardigrades Can’t Survive - Featured Image" [ref=e1008]
+                      - img [ref=e1010]
+              - article [ref=e1013]:
+                - link "View details" [ref=e1014] [cursor=pointer]:
+                  - /url: /news/04P3QyH/white-house-blocks-intelligence-report-warning
+                - generic [ref=e1015]:
+                  - generic [ref=e1016]: Trending
+                  - generic [ref=e1017]: 1d
+                - generic [ref=e1018]:
+                  - generic [ref=e1019]:
+                    - paragraph [ref=e1020]: White House blocks intelligence report warning of rising US homeland terror threat linked to Iran war | Daily Mail Online
+                    - generic [ref=e1021]:
+                      - generic [ref=e1022]:
+                        - img [ref=e1023]
+                        - generic [ref=e1025]: "79"
+                      - generic [ref=e1026]:
+                        - img [ref=e1027]
+                        - generic [ref=e1029]: "17"
+                  - link [ref=e1030] [cursor=pointer]:
+                    - /url: /news/04P3QyH/white-house-blocks-intelligence-report-warning
+                    - complementary [ref=e1031]:
+                      - img "White House blocks intelligence report warning of rising US homeland terror threat linked to Iran war | Daily Mail Online - Featured Image" [ref=e1032]
+                      - img [ref=e1034]
+              - article [ref=e1037]:
+                - link "View details" [ref=e1038] [cursor=pointer]:
+                  - /url: /music/blvZNfE/keanu-reeves-band-dogstar-returns-with
+                - generic [ref=e1039]:
+                  - generic [ref=e1040]: Trending
+                  - generic [ref=e1041]: 1d
+                - generic [ref=e1042]:
+                  - generic [ref=e1043]:
+                    - paragraph [ref=e1044]: Keanu Reeves’ Band Dogstar Returns With New Album ‘All in Now’
+                    - generic [ref=e1045]:
+                      - generic [ref=e1046]:
+                        - img [ref=e1047]
+                        - generic [ref=e1049]: "77"
+                      - generic [ref=e1050]:
+                        - img [ref=e1051]
+                        - generic [ref=e1053]: "4"
+                  - link [ref=e1054] [cursor=pointer]:
+                    - /url: /music/blvZNfE/keanu-reeves-band-dogstar-returns-with
+                    - complementary [ref=e1055]:
+                      - img "Keanu Reeves’ Band Dogstar Returns With New Album ‘All in Now’ - Featured Image" [ref=e1056]
+                      - img [ref=e1058]
+              - article [ref=e1061]:
+                - link "View details" [ref=e1062] [cursor=pointer]:
+                  - /url: /music/GZYu8Vp/the-best-samples-in-history
+                - generic [ref=e1063]:
+                  - generic [ref=e1064]: Trending
+                  - generic [ref=e1065]: 1d
+                - generic [ref=e1066]:
+                  - generic [ref=e1067]:
+                    - paragraph [ref=e1068]: the best samples in history
+                    - generic [ref=e1069]:
+                      - generic [ref=e1070]:
+                        - img [ref=e1071]
+                        - generic [ref=e1073]: "78"
+                      - generic [ref=e1074]:
+                        - img [ref=e1075]
+                        - generic [ref=e1077]: "2"
+                  - link [ref=e1078] [cursor=pointer]:
+                    - /url: /music/GZYu8Vp/the-best-samples-in-history
+                    - complementary [ref=e1079]:
+                      - img "the best samples in history - Featured Image" [ref=e1080]
+                      - img [ref=e1082]
+          - generic [ref=e1084]:
+            - generic [ref=e1085]:
+              - link "Terms of Service" [ref=e1086] [cursor=pointer]:
+                - /url: https://docs.digg.com/terms
+              - link "Privacy Policy" [ref=e1087] [cursor=pointer]:
+                - /url: https://docs.digg.com/privacy
+            - generic [ref=e1088]:
+              - link "About" [ref=e1089] [cursor=pointer]:
+                - /url: https://about.digg.com
+              - link "Swag" [ref=e1090] [cursor=pointer]:
+                - /url: https://swag.digg.com
+              - generic [ref=e1091]: © 2026 Digg, Inc.
+  - region "Notifications (F8)":
+    - list
+  - alert [ref=e1092]
+```

@@ -52,21 +52,42 @@ async function main() {
 
                     // Grab the text of the body while THIS tab is active, appending it to the context
                     const tabContent = await page.innerText('body');
-                    extractedContext += `\\n--- TAB: ${tabName} ---\\n${tabContent}\\n`;
+                    extractedContext += `\n--- TAB: ${tabName} ---\n${tabContent}\n`;
                 }
             } catch (e) {
                 // Ignore if tab isn't found or clickable
             }
         }
 
-        // Basic initial sanitization to redact passwords, JWT tokens, and API keys before sending to Claude
-        const redactedContent = extractedContext
-            .replace(/(["']?password["']?\s*[:=]\s*["']?)([^"'\s,}]+)(["']?)/gi, '$1***REDACTED***$3')
-            .replace(/(bearer\s+)([A-Za-z0-9_=\-\.]+)/gi, '$1***REDACTED***')
-            .replace(/(["']?api_?key["']?\s*[:=]\s*["']?)([^"'\s,}]+)(["']?)/gi, '$1***REDACTED***$3')
-            .replace(/(["']?secret["']?\s*[:=]\s*["']?)([^"'\s,}]+)(["']?)/gi, '$1***REDACTED***$3');
+        // Step 1: Redact credentials before sending to Claude
+        let filtered = extractedContext
+            .replace(/(['"]?password['"]?\s*[:=]\s*['"]?)([^'"\s,}]+)(['"]?)/gi, '$1***REDACTED***$3')
+            .replace(/(bearer\s+)([A-Za-z0-9_=\-.]+)/gi, '$1***REDACTED***')
+            .replace(/(['"]?api_?key['"]?\s*[:=]\s*['"]?)([^'"\s,}]+)(['"]?)/gi, '$1***REDACTED***$3')
+            .replace(/(['"]?secret['"]?\s*[:=]\s*['"]?)([^'"\s,}]+)(['"]?)/gi, '$1***REDACTED***$3');
 
-        extractedContext = `Url: ${jamUrl}\n\nVisible Page Data (contains logs, networks, and actions):\n${redactedContent}`;
+        // Step 2: Strip technical noise so it doesn't contaminate Gherkin/test output.
+        // Keep lines describing user actions and visible content; drop console errors, CDN noise, metadata.
+        filtered = filtered
+            .split('\n')
+            .filter(line => {
+                const l = line.trim();
+                if (!l) return false;
+                // Drop console error / warning / exception lines
+                if (/^(error|warn(ing)?|uncaught|typeerror|resizeobserver|logrocket|sentry)/i.test(l)) return false;
+                // Drop raw CDN / media / analytics URLs (not user-facing navigation)
+                if (/https?:\/\/[^\s]*(\.mp3|\.mp4|\.woff2?|\.png|\.jpg|\.gif|cloudfront\.net|cdn\.|analytics|segment\.io|sentry\.io|logrocket\.com)/i.test(l)) return false;
+                // Drop lines that are only a net:: error or bare HTTP status
+                if (/net::err_|http\/[12]\.[01]\s+\d{3}/i.test(l)) return false;
+                // Drop lines that are only a video timestamp (e.g. "0:48" or "00:03.4")
+                if (/^\d{1,2}:\d{2}(\.\d+)?$/.test(l)) return false;
+                // Drop browser / OS metadata lines
+                if (/chrome\/\d+|mozilla\/5\.0|window size|resolution:/i.test(l)) return false;
+                return true;
+            })
+            .join('\n');
+
+        extractedContext = `Url: ${jamUrl}\n\nVisible Page Data (contains user actions, navigation, and visible text):\n${filtered}`;
 
         // Wait for the video title to load (it's often in the <title> tag)
         const rawTitle = await page.title();
