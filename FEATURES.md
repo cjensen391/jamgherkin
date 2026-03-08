@@ -32,4 +32,10 @@ Data security is automatically managed when scraping Jam.dev data and passing th
 - **Pre-Prompt Sanitization**: A middleware step regex-searches the scraped HTML and logs before sending it to the LLM.
 - **Targeted Obfuscation**: Passwords, API Keys, Bearer tokens, and System Secrets are rewritten as `***REDACTED***`.
 
-*(Use Case: An engineer accidentally leaves a real API key visible in the network tab inside the Jam video. The scraper extracts it, but the redaction filter successfully blocks it from ever being dispatched to Anthropic's endpoints.)*
+### 5. Automatic Test Execution
+After all three test suites are generated and saved to disk, the tool immediately runs the generated Playwright test in headed mode.
+- **Instant Feedback Loop**: You can watch the generated test play out in a real browser window the moment generation finishes, without any extra steps.
+- **Immediate Pass/Fail Signal**: The exit code of the Playwright run is captured. A clear ✅ or ⚠️ message is printed so you know right away if the generated test passes against your running application.
+- **Zero Manual Wiring**: No need to open a terminal or remember a `npx playwright test` command — the end-to-end workflow from Jam URL to live test run is fully automatic.
+
+*(Use Case: A QA engineer runs `npm run runQA <url>`, grabs a coffee, and returns to a browser window showing the generated test executing — plus a pass/fail result — without touching any other tooling.)*

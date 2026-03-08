@@ -43,6 +43,7 @@ npm run runQA https://jam.dev/c/28a8d5f3-11b2-1...
 4. Playwright tests are saved to the `tests/` directory.
 5. Cypress tests are saved to `cypress/e2e/`.
 6. Gherkin behavioral specs are saved to `features/`.
+7. The generated Playwright test is automatically executed in **headed mode** so you can immediately see it running in a browser window.
 
 ## The Self-Healing Runtime
 When running your newly generated Playwright tests, you don't have to fear minor UI tweaks breaking your test suite.
