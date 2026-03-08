@@ -61,6 +61,34 @@ The Gherkin prompt instructs Claude to write in business language (no tag names,
 ### 6. Automated Sensitive Data Redaction
 - Passwords, API keys, Bearer tokens, and secrets are replaced with `***REDACTED***` before the payload reaches Claude.
 
+### 7. Cross-Repo Integration
+JamGherkin can write tests directly into another codebase and inject that repo's own test utilities into generated code — no copy-paste required.
+
+**Configurable output directories** via CLI flags:
+- `--out-playwright <dir>` — write Playwright tests to any path
+- `--out-cypress <dir>` — write Cypress tests to any path
+- `--out-features <dir>` — write Gherkin features to any path
+- `--no-run` — skip automatically running the test after generation
+
+**Test utility injection** via `--test-utils "<import-path>:<Export1>,<Export2>"`:
+Tell Claude what helper functions already exist in the target repo. Claude will import and use them in generated tests instead of reimplementing login flows, DB setup, etc. inline.
+
+```bash
+npm run runQA -- https://jam.dev/c/abc123 \
+  --out-playwright /path/to/other-repo/tests \
+  --test-utils "../test-utils/auth:loginAs,logoutAs" \
+  --test-utils "../test-utils/db:seedUser,clearDatabase" \
+  --no-run
+```
+
+**Importable self-heal module** via npm link or git URL:
+```ts
+import { aiClick, aiFill } from 'jamgherkin/self-heal';
+```
+Install via `npm link` for local dev or `"jamgherkin": "github:your-org/jamgherkin"` as a git dependency.
+
+*(Use Case: A team maintains `other-repo` with a shared `loginAs()` helper. Running `runQA` with `--test-utils "../helpers:loginAs"` means every generated test automatically calls `loginAs()` at the top instead of duplicating the login steps.)*
+
 ---
 
 ## 📋 Planned / TODO
@@ -74,7 +102,10 @@ The Gherkin prompt instructs Claude to write in business language (no tag names,
 
 ### Test Generation Improvements
 - [ ] Cypress self-healing wrappers (`cyClick`, `cyFill`) analogous to Playwright ones
-- [ ] Support `--gherkin-only` flag to skip Playwright/Cypress generation
+- [x] `--no-run` flag to skip running the generated test
+- [x] `--out-playwright` / `--out-cypress` / `--out-features` flags for custom output dirs
+- [x] `--test-utils` flag to inject helper imports into generated code
+- [ ] `--gherkin-only` flag to skip Playwright/Cypress generation
 - [ ] Batch mode: accept multiple Jam URLs in one run
 - [ ] Optional step to scan existing test files and de-duplicate against newly generated ones
 

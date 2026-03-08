@@ -1,5 +1,12 @@
 import Anthropic from "@anthropic-ai/sdk";
 
+export interface TestUtil {
+    /** Import path relative to the generated test file, e.g. "../test-utils/helpers" */
+    importPath: string;
+    /** Named exports available from that module, e.g. ["loginAs", "setupTestDb"] */
+    exports: string[];
+}
+
 export class ClaudeService {
     private anthropic: Anthropic;
     private model: string;
@@ -10,7 +17,18 @@ export class ClaudeService {
         this.model = "claude-haiku-4-5-20251001"; // Anthropic's lowest cost model available in 2026 for this key
     }
 
-    async generateTest(context: string, framework: "playwright" | "cypress" | "gherkin"): Promise<string> {
+    async generateTest(
+        context: string,
+        framework: "playwright" | "cypress" | "gherkin",
+        testUtils: TestUtil[] = [],
+    ): Promise<string> {
+        // Build an optional block telling Claude what helper functions exist in the target repo
+        const testUtilsNote = testUtils.length > 0
+            ? `\n      Available test utilities in the target codebase (use these instead of reimplementing):\n${testUtils.map(u =>
+                `      - import { ${u.exports.length > 0 ? u.exports.join(', ') : '*'} } from "${u.importPath}";`
+            ).join('\n')}\n      Prefer these helpers where relevant (e.g. for login flows, DB setup, common assertions).\n`
+            : '';
+
         const prompt = framework === "gherkin" ? `
       You are a senior QA engineer writing BDD feature files for a product team.
       I will provide you with raw technical data scraped from a Jam.dev recording (console logs, network requests, DOM events, user actions).
@@ -37,13 +55,13 @@ export class ClaudeService {
       4. If a bug is present, write a dedicated Scenario named "Bug: <short description>" that describes the expected vs actual behaviour.
       5. Output ONLY the raw text for the .feature file. No markdown. No backticks.
     ` : `
-      You are an expert QA engineer. 
+      You are an expert QA engineer.
       I will provide you with the technical context extracted from a Jam.dev video recording (console logs, network requests, DOM events).
       Based on this context, your task is to write an end-to-end automated test using the ${framework} framework.
 
       Jam Context:
       ${context}
-
+      ${testUtilsNote}
       Instructions:
       1. Identify the core user flow or bug being demonstrated.
       2. Write a complete ${framework} test file using TypeScript.
@@ -52,12 +70,13 @@ export class ClaudeService {
       5. If the flow involves logging in or authentication, use environment variables for credentials:
          - Playwright: Use \`process.env.TEST_EMAIL\` and \`process.env.TEST_PASSWORD\`
          - Cypress: Use \`Cypress.env('TEST_EMAIL')\` and \`Cypress.env('TEST_PASSWORD')\`
-         - Gherkin: Use literal placeholders like \`<TEST_EMAIL>\` or write steps like "Given I am logged in as a test user".
-      ${framework === 'playwright' ? `6. VERY IMPORTANT: Instead of standard await page.locator(...).click() or fill(), you MUST use the self-healing wrappers aiClick and aiFill. 
+         ${testUtils.length > 0 ? '- If a login utility is available above, use it instead of implementing the login steps manually.' : ''}
+      ${framework === 'playwright' ? `6. VERY IMPORTANT: Instead of standard await page.locator(...).click() or fill(), you MUST use the self-healing wrappers aiClick and aiFill.
          - Import them: import { aiClick, aiFill } from "../src/self-heal.js";
          - Use them: await aiClick(page, "button.submit", "Submit the login form");
-                                await aiFill(page, "input#email", process.env.TEST_EMAIL ?? "", "Fill the email field");
-         - NEVER use \`networkidle\` for Playwright's \`waitForLoadState\` or \`waitForNavigation\`. Modern websites like Digg.com often never reach network idle due to background requests or ads. Use \`domcontentloaded\` instead.` : `6. IMPORTANT: Identify any significant network requests (API calls) that occur immediately after a user click or interaction. Add code to intercept/alias these network calls and wait for them to complete before proceeding to the next step (e.g., page.waitForResponse or cy.intercept/cy.wait).`}
+                     await aiFill(page, "input#email", process.env.TEST_EMAIL ?? "", "Fill the email field");
+         - NEVER use \`networkidle\` for Playwright's \`waitForLoadState\` or \`waitForNavigation\`. Use \`domcontentloaded\` instead.`
+            : `6. IMPORTANT: Identify significant network requests after user interactions. Add code to intercept/alias these calls and wait for them (e.g. page.waitForResponse or cy.intercept/cy.wait).`}
       7. Output ONLY the raw TypeScript code, DO NOT INCLUDE markdown formatting backticks (\`\`\`) at the beginning or end of the output.
     `;
 
@@ -68,13 +87,11 @@ export class ClaudeService {
                 messages: [{ role: "user", content: prompt }]
             });
 
-            // Anthropic specifically returns text in the block content
             const block = response.content.find(block => block.type === 'text');
             if (block && block.type === 'text') {
                 let text = block.text.trim();
                 text = text.replace(/^```[a-zA-Z0-9-]*\n/i, "");
                 text = text.replace(/\n```$/i, "");
-
                 return text.trim();
             }
             return "Error: Could not extract text from Claude response.";
@@ -84,7 +101,12 @@ export class ClaudeService {
         }
     }
 
-    async healSelector(failedSelector: string, description: string, domContext: string, previouslyTried: string[] = []): Promise<string> {
+    async healSelector(
+        failedSelector: string,
+        description: string,
+        domContext: string,
+        previouslyTried: string[] = [],
+    ): Promise<string> {
         const alreadyTriedNote = previouslyTried.length > 1
             ? `\nDo NOT use any of these selectors — they have already been tried and failed:\n${previouslyTried.map(s => `  - ${s}`).join('\n')}\n`
             : '';
@@ -96,7 +118,7 @@ IMPORTANT: The description above is an imperative test instruction, NOT the elem
 Prefer selectors in this order (most to least resilient):
 1. [data-testid="..."] or [data-cy="..."] or [data-test="..."]
 2. role= with name= — use the SHORT visible label, e.g., role=button[name="Apply Filters"]
-3. [aria-label="..."] — again, use the actual label, not the description sentence
+3. [aria-label="..."] — use the actual label, not the description sentence
 4. Unique visible text: text="Apply Filters" or button:has-text("Submit")
 5. Structural: parent > child with type (e.g., form > button[type=submit])
 6. [id="..."] or [name="..."] or [type="..."] attributes
@@ -114,7 +136,7 @@ Reply with ONLY the raw selector string, no quotes, no explanation.`;
 
         try {
             const response = await this.anthropic.messages.create({
-                model: this.model, // We still use the lowest cost model here for speed
+                model: this.model,
                 max_tokens: 100,
                 messages: [{ role: "user", content: prompt }]
             });

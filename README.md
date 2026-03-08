@@ -12,6 +12,7 @@ JamGherkin acts as a bridge between your bug reports and your CI pipeline. Provi
 - 🔎 **Token-Efficient DOM Extraction**: Sends only interactive elements (buttons, inputs, links, roles, aria- and data- attributes) to Claude — typically 5k chars vs 50k for the full body.
 - 🔐 **Intelligent Security**: Automatically redacts passwords, JWTs, and API keys from scraped Jam data before it reaches Claude. Auth flows inject `TEST_EMAIL` and `TEST_PASSWORD` from your `.env`.
 - 📄 **Clean Gherkin**: Noise-filters console errors, CDN URLs, timestamps, and browser metadata before generation so Gherkin reads as business language, not a debug log.
+- 🔗 **Cross-Repo Integration**: Generate tests directly into another codebase via `--out-*` flags. Inject that repo's test utilities (login helpers, DB seeders) into generated code via `--test-utils`. Use `jamgherkin/self-heal` as an npm dependency for self-healing in any Playwright project.
 
 ## Setup
 ### 1. Install Dependencies
@@ -28,14 +29,54 @@ Fill out `.env` with your API keys:
 - `ANTHROPIC_API_KEY`: Your Claude / Anthropic API Key.
 - `TEST_EMAIL` / `TEST_PASSWORD`: Test credentials injected into generated auth flows.
 
+
 ## Usage
-Run the QA generation script against any Jam URL:
+
+### Basic
 ```bash
-npm run runQA <jam-url>
+npm run runQA -- <jam-url>
 ```
-*Example:*
+
+### All options
+```
+npm run runQA -- <jam-url> [options]
+
+  --out-playwright <dir>   Playwright output dir   (default: ./tests)
+  --out-cypress    <dir>   Cypress output dir      (default: ./cypress/e2e)
+  --out-features   <dir>   Gherkin output dir      (default: ./features)
+  --test-utils     <spec>  Inject a helper module from the target codebase.
+                           Format: "<import-path>:<Export1>,<Export2>"
+                           Example: "../test-utils/auth:loginAs,logoutAs"
+                           Repeat for multiple utility files.
+  --no-run                 Skip running the generated Playwright test.
+```
+
+### Writing tests into another codebase
+Point the output dirs at your other repo and tell Claude what helpers exist there:
 ```bash
-npm run runQA https://jam.dev/c/28a8d5f3-11b2-1...
+npm run runQA -- https://jam.dev/c/abc123 \
+  --out-playwright /path/to/other-repo/tests \
+  --out-cypress    /path/to/other-repo/cypress/e2e \
+  --out-features   /path/to/other-repo/features \
+  --test-utils     "../test-utils/auth:loginAs,logoutAs" \
+  --test-utils     "../test-utils/db:seedUser,clearDatabase" \
+  --no-run
+```
+Claude will import and use those helpers instead of reimplementing them.
+
+### Using `aiClick` / `aiFill` from another project
+**Option A — `npm link` (local dev):**
+```bash
+cd jamgherkin && npm run build && npm link
+cd ../other-repo && npm link jamgherkin
+```
+**Option B — git dependency:**
+```json
+"dependencies": { "jamgherkin": "github:your-username/jamgherkin" }
+```
+Then in tests:
+```ts
+import { aiClick, aiFill } from 'jamgherkin/self-heal';
 ```
 
 ### What Happens?

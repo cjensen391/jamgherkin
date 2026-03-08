@@ -6,7 +6,18 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "runQA": "tsx src/index.ts",
-    "discover": "tsx src/discover.ts"
+    "discover": "tsx src/discover.ts",
+    "build": "tsc --outDir dist"
+  },
+  "exports": {
+    ".": {
+      "import": "./dist/claude-service.js",
+      "types": "./dist/claude-service.d.ts"
+    },
+    "./self-heal": {
+      "import": "./dist/self-heal.js",
+      "types": "./dist/self-heal.d.ts"
+    }
   },
   "keywords": [],
   "author": "",
