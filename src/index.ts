@@ -56,17 +56,41 @@ async function main() {
 
         // Finally, extract the entire innerText of the app to grab all revealed logs and events
         const bodyContent = await page.innerText('body');
-        extractedContext = `Url: ${jamUrl}\n\nVisible Page Data (contains logs, networks, and actions):\n${bodyContent}`;
+
+        // Basic initial sanitization to redact passwords, JWT tokens, and API keys before sending to Claude
+        const redactedContent = bodyContent
+            .replace(/(["']?password["']?\s*[:=]\s*["']?)([^"'\s,}]+)(["']?)/gi, '$1***REDACTED***$3')
+            .replace(/(bearer\s+)([A-Za-z0-9_=\-\.]+)/gi, '$1***REDACTED***')
+            .replace(/(["']?api_?key["']?\s*[:=]\s*["']?)([^"'\s,}]+)(["']?)/gi, '$1***REDACTED***$3')
+            .replace(/(["']?secret["']?\s*[:=]\s*["']?)([^"'\s,}]+)(["']?)/gi, '$1***REDACTED***$3');
+
+        extractedContext = `Url: ${jamUrl}\n\nVisible Page Data (contains logs, networks, and actions):\n${redactedContent}`;
+
+        // Wait for the video title to load (it's often in the <title> tag)
+        const rawTitle = await page.title();
+        // Fallback to jamId if title is empty or generic, otherwise sanitize the title
+        let safeTitle = jamId;
+        if (rawTitle && rawTitle !== "Jam") {
+            // Remove " - Jam" if present, then sanitize for file system
+            safeTitle = rawTitle.replace(/\s*-\s*Jam\s*$/i, '')
+                .toLowerCase()
+                .replace(/[^a-z0-9]+/g, '-')
+                .replace(/(^-|-$)/g, '');
+        }
+
+        // Ensure we don't end up with an empty string
+        if (!safeTitle) safeTitle = jamId;
 
         await browser.close();
         console.log("✅ Scrape complete. Length of context extracted:", extractedContext.length, "characters.");
+        console.log(`🎬 Video Title Extracted: "${rawTitle}" -> Using filename: "${safeTitle}"`);
 
         console.log("\n3. Generating Playwright test with Claude...");
         const playwrightTest = await claude.generateTest(extractedContext, "playwright");
         console.log("\n--- Playwright Test ---");
         console.log(playwrightTest);
 
-        const playwrightPath = path.join(process.cwd(), "tests", `${jamId}.spec.ts`);
+        const playwrightPath = path.join(process.cwd(), "tests", `${safeTitle}.spec.ts`);
         fs.mkdirSync(path.dirname(playwrightPath), { recursive: true });
         fs.writeFileSync(playwrightPath, playwrightTest);
         console.log(`\n💾 Saved Playwright test to: ${playwrightPath}`);
@@ -76,10 +100,20 @@ async function main() {
         console.log("\n--- Cypress Test ---");
         console.log(cypressTest);
 
-        const cypressPath = path.join(process.cwd(), "cypress", "e2e", `${jamId}.cy.js`);
+        const cypressPath = path.join(process.cwd(), "cypress", "e2e", `${safeTitle}.cy.js`);
         fs.mkdirSync(path.dirname(cypressPath), { recursive: true });
         fs.writeFileSync(cypressPath, cypressTest);
         console.log(`\n💾 Saved Cypress test to: ${cypressPath}`);
+
+        console.log("\n5. Generating Gherkin feature file with Claude...");
+        const gherkinTest = await claude.generateTest(extractedContext, "gherkin");
+        console.log("\n--- Gherkin Feature ---");
+        console.log(gherkinTest);
+
+        const gherkinPath = path.join(process.cwd(), "features", `${safeTitle}.feature`);
+        fs.mkdirSync(path.dirname(gherkinPath), { recursive: true });
+        fs.writeFileSync(gherkinPath, gherkinTest);
+        console.log(`\n💾 Saved Gherkin feature to: ${gherkinPath}`);
 
         console.log("\n✅ Generation complete!");
 
