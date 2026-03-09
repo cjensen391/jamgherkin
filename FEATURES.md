@@ -12,10 +12,11 @@ Pass a Jam.dev recording URL and the system writes test suites across all three 
 
 *(Use Case: A QA engineer or PM records a bug in Jam. The system instantly generates automated regressions for Playwright and Cypress, closing the gap between manual reporting and automation.)*
 
-### 8. Jam MCP Integration
-- **Automatic Discovery**: Use `--list-jams` to fetch your 10 most recent recordings directly from the Jam API via the Model Context Protocol.
-- **Handshake Recovery**: Implements a custom handshake to handle Jam's session-based SSE protocol.
-- **Metadata Access**: Leverages `listJams` and `getJam` tools for deep context extraction.
+### 8. Jam MCP Integration (Model Context Protocol)
+- **Zero-Config Context**: No more scraping video pages. JamGherkin connects directly to the [Jam MCP Server](https://mcp.jam.dev/mcp) to fetch high-fidelity technical events.
+- **Automatic Domain Isolation**: By default, the tool extracts the target domain (e.g., `digg.com`) and silences common noisy hosts (like `jam.dev` analytics).
+- **Surgical Network Filtering**: Use CLI flags like `--status-code 5xx` or `--content-type application/json` to prune the technical "firehose" before it reaches the AI.
+- **Search & List**: Use `--list-jams` or search by title to find recordings without leaving the terminal.
 
 ---
 
@@ -35,8 +36,11 @@ Performs 3 quick attempts with a 1s delay. This handles "blink and you miss it" 
 **Phase 2 — Heuristic (no AI, no tokens):**
 Derives 30+ selector candidates from the original selector string and the element description. Each is tried with a 300ms probe.
 
-**Phase 3 — Claude (up to 5 attempts):**
-If no heuristic works, Claude receives a compact DOM snapshot. It is told which selectors already failed and uses a higher attempt limit (5) to find the most resilient fix. Successful fixes are saved to the persistent cache.
+**Phase 3 — Ground Truth Healing (Claude-powered):**
+If no heuristic works, Claude receives a compact DOM snapshot *and* the original "Ground Truth" brief from the Jam recording.
+- **Context-Aware Recovery**: Claude uses the original technical context (what the user was doing, what network calls were made) to identify the intended element in the current, potentially broken DOM.
+- **Fail-Fast Loops**: Tracks already-tried selectors to prevent AI "dead-ends."
+- **Attempt Limit**: Uses up to 5 attempts to find the most resilient fix.
 
 *(Use Case: A developer renames a CSS class or moves an element. The first test to hit it calls Claude. Every subsequent test in the same video run uses the cached fix instantly — no extra AI cost or delay.)*
 - To prefer stable attributes (`data-testid`, role, aria) and never use Tailwind/CSS-Modules class names
