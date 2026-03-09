@@ -249,7 +249,10 @@ Return ONLY a JSON object:
 
             const block = response.content.find(block => block.type === 'text');
             if (block && block.type === 'text') {
-                return JSON.parse(block.text.trim());
+                let text = block.text.trim();
+                text = text.replace(/^```[a-zA-Z0-9-]*\n/i, "");
+                text = text.replace(/\n```$/i, "");
+                return JSON.parse(text.trim());
             }
             return { action: 'fail', message: 'Could not parse Claude response.' };
         } catch (e) {

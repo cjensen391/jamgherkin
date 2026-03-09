@@ -43,6 +43,85 @@ function saveToCache(originalSelector: string, healedSelector: string) {
 }
 
 /**
+ * Attempts to automatically update the test source file with the new selector.
+ */
+function updateTestSourceFile(originalSelector: string, healedSelector: string) {
+    try {
+        const stack = new Error().stack;
+        if (!stack) return;
+
+        let callerFile = '';
+        let callerLineNum = -1;
+
+        const lines = stack.split('\n');
+        for (const line of lines) {
+            if (line.includes('self-heal.') || line.includes('self-heal:')) continue;
+
+            let fileVal = '';
+            let lineVal = '';
+
+            const parenMatch = line.match(/\(([^)]+):(\d+):(\d+)\)/);
+            if (parenMatch) {
+                fileVal = parenMatch[1] || '';
+                lineVal = parenMatch[2] || '';
+            } else {
+                const atMatch = line.match(/at (.*):(\d+):(\d+)/);
+                if (atMatch) {
+                    fileVal = atMatch[1] || '';
+                    lineVal = atMatch[2] || '';
+                }
+            }
+
+            if (fileVal) {
+                if (fileVal.startsWith('file://')) fileVal = fileVal.substring(7);
+                callerFile = fileVal.trim();
+
+                if (callerFile.startsWith('node:') || callerFile.includes('node_modules')) continue;
+                if (callerFile.endsWith('.ts') || callerFile.endsWith('.js')) {
+                    callerLineNum = parseInt(lineVal, 10);
+                    break;
+                }
+            }
+        }
+
+        if (!callerFile || !fs.existsSync(callerFile)) return;
+
+        const content = fs.readFileSync(callerFile, 'utf-8');
+        const fileLines = content.split('\n');
+        const lineIdx = callerLineNum - 1;
+
+        let updated = false;
+
+        // Try exact line update
+        if (lineIdx >= 0 && lineIdx < fileLines.length) {
+            const originalLine = fileLines[lineIdx];
+            if (originalLine && originalLine.includes(originalSelector)) {
+                fileLines[lineIdx] = originalLine.replace(originalSelector, healedSelector);
+                if (fileLines[lineIdx] !== originalLine) {
+                    fs.writeFileSync(callerFile, fileLines.join('\n'), 'utf-8');
+                    updated = true;
+                }
+            }
+        }
+
+        // Fallback global update
+        if (!updated && content.includes(originalSelector)) {
+            const newContent = content.split(originalSelector).join(healedSelector);
+            if (newContent !== content) {
+                fs.writeFileSync(callerFile, newContent, 'utf-8');
+                updated = true;
+            }
+        }
+
+        if (updated) {
+            console.log(`\n📝 [Self-Heal] Auto-updated source file: ${callerFile}:${callerLineNum > 0 ? callerLineNum : ''}`);
+        }
+    } catch (e) {
+        console.warn(`⚠️ Failed to auto-update source file: ${e}`);
+    }
+}
+
+/**
  * Generates a ranked list of heuristic selector candidates from the original
  * selector string and the human description. These are tried cheaply (no AI)
  * before falling back to Claude, saving tokens and time.
@@ -290,6 +369,7 @@ export async function aiHealAction(
             console.log(`✅ Healed with heuristic selector: '${candidate}'`);
             console.warn(`💡 TIP: Update your test suite to use '${candidate}' instead of '${selectorStr}'`);
             saveToCache(selectorStr, candidate);
+            updateTestSourceFile(selectorStr, candidate);
             return;
         }
         triedWithErrors.push({ selector: candidate });
@@ -371,6 +451,7 @@ export async function aiHealAction(
                 console.log(`✅ Healed on Claude attempt ${attempt}. Selector: '${proposedSelector}'`);
                 console.warn(`💡 TIP: Update your test suite to use '${proposedSelector}' instead of '${selectorStr}'`);
                 saveToCache(selectorStr, proposedSelector);
+                updateTestSourceFile(selectorStr, proposedSelector);
                 return;
             } else {
                 triedWithErrors.push({ selector: proposedSelector, error: 'Timeout or interaction failure' });

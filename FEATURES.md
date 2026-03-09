@@ -134,7 +134,7 @@ Switch providers by changing the service instantiated in `index.ts`. Requires th
 - [x] Add transient retry loop for initial actions (handles loading/animations)
 - [x] Implement Navigation & Assertion Healing (`aiWaitForURL`)
 - [x] Implement Error-Aware Healing (passing Playwright errors to AI)
-- [ ] Auto-update test source files in-place when a selector is healed
+- [x] Auto-update test source files in-place when a selector is healed
 - [ ] Validate Claude's proposed selector against priority rules
 
 ### Test Generation Improvements
