@@ -4,6 +4,7 @@ dist/
 coverage/
 .DS_Store
 cypress/e2e/
+cypress/**/*.cy.ts
 tests/
 features/
 test-results/

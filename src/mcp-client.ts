@@ -108,6 +108,79 @@ export class JamMcpClient {
         return [];
     }
 
+    private async fetchTool(name: string, jamIdOrUrl: string, extraParams: object = {}): Promise<string> {
+        console.log(`   - Calling tool: ${name}...`);
+        const res = await fetch(this.url, {
+            method: "POST",
+            headers: {
+                "Authorization": `Bearer ${this.token}`,
+                "Content-Type": "application/json",
+                "Accept": "application/json, text/event-stream",
+                "mcp-session-id": this.sessionId || ""
+            },
+            body: JSON.stringify({
+                jsonrpc: "2.0",
+                method: "tools/call",
+                params: {
+                    name,
+                    arguments: { jamId: jamIdOrUrl, ...extraParams }
+                },
+                id: `${Date.now()}-${name}`
+            })
+        });
+
+        if (!res.body) return "";
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let resultText = "";
+        let buffer = "";
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split("\n");
+            buffer = lines.pop() || "";
+
+            for (const line of lines) {
+                if (line.startsWith("data: ")) {
+                    try {
+                        const json = JSON.parse(line.slice(6));
+                        if (json.result?.content?.[0]?.text) {
+                            let text = json.result.content[0].text;
+                            if (text.length > 20000) {
+                                text = text.substring(0, 20000) + "... (truncated)";
+                            }
+                            resultText = text;
+                        }
+                    } catch (e) { }
+                }
+            }
+            if (resultText) break;
+        }
+        reader.cancel().catch(() => { });
+        return resultText;
+    }
+
+    async getJamDomain(jamIdOrUrl: string): Promise<string | undefined> {
+        await this.ensureSession();
+        const eventsText = await this.fetchTool("getUserEvents", jamIdOrUrl, { limit: 10 });
+
+        const lines = eventsText.split("\n");
+        for (const line of lines) {
+            try {
+                const urlMatch = line.match(/"url"\s*:\s*"([^"]+)"/);
+                if (urlMatch && urlMatch[1]) {
+                    const parsedUrl = new URL(urlMatch[1]);
+                    return parsedUrl.hostname;
+                }
+            } catch (e) {
+            }
+        }
+        return undefined;
+    }
+
     async getJamContext(
         jamIdOrUrl: string,
         networkFilters: {
@@ -119,66 +192,10 @@ export class JamMcpClient {
     ): Promise<string> {
         await this.ensureSession();
 
-        const fetchTool = async (name: string, extraParams: object = {}) => {
-            console.log(`   - Calling tool: ${name}...`);
-            const res = await fetch(this.url, {
-                method: "POST",
-                headers: {
-                    "Authorization": `Bearer ${this.token}`,
-                    "Content-Type": "application/json",
-                    "Accept": "application/json, text/event-stream",
-                    "mcp-session-id": this.sessionId || ""
-                },
-                body: JSON.stringify({
-                    jsonrpc: "2.0",
-                    method: "tools/call",
-                    params: {
-                        name,
-                        arguments: { jamId: jamIdOrUrl, ...extraParams }
-                    },
-                    id: `${Date.now()}-${name}`
-                })
-            });
-
-            if (!res.body) return "";
-            const reader = res.body.getReader();
-            const decoder = new TextDecoder();
-            let resultText = "";
-            let buffer = "";
-
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
-
-                buffer += decoder.decode(value, { stream: true });
-                const lines = buffer.split("\n");
-                buffer = lines.pop() || "";
-
-                for (const line of lines) {
-                    if (line.startsWith("data: ")) {
-                        try {
-                            const json = JSON.parse(line.slice(6));
-                            if (json.result?.content?.[0]?.text) {
-                                let text = json.result.content[0].text;
-                                if (text.length > 20000) {
-                                    text = text.substring(0, 20000) + "... (truncated)";
-                                }
-                                resultText = text;
-                            }
-                        } catch (e) { }
-                    }
-                }
-                // If we got a result, we can probably stop reading for this specific tool call
-                if (resultText) break;
-            }
-            reader.cancel().catch(() => { });
-            return resultText;
-        };
-
         const [events, logs, network] = await Promise.all([
-            fetchTool("getUserEvents", { limit: 100 }), // Limit events too
-            fetchTool("getConsoleLogs", { limit: 20 }),
-            fetchTool("getNetworkRequests", {
+            this.fetchTool("getUserEvents", jamIdOrUrl, { limit: 100 }), // Limit events too
+            this.fetchTool("getConsoleLogs", jamIdOrUrl, { limit: 20 }),
+            this.fetchTool("getNetworkRequests", jamIdOrUrl, {
                 limit: networkFilters.limit || 20,
                 statusCode: networkFilters.statusCode,
                 contentType: networkFilters.contentType,

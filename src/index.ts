@@ -4,6 +4,8 @@ import dotenv from "dotenv";
 import fs from "fs";
 import path from "path";
 import { spawnSync } from "child_process";
+import * as readline from "readline/promises";
+import { stdin as input, stdout as output } from "process";
 dotenv.config();
 
 process.on('unhandledRejection', (reason, promise) => {
@@ -52,12 +54,14 @@ function parseArgs(): ParsedArgs {
     const listJams = argv.includes('--list-jams');
     const mcpFetch = argv.includes('--mcp-fetch');
 
-    if (!jamUrl && !listJams) {
+    if (!jamUrl && !listJams && argv.includes('--help')) {
         console.error([
-            'Usage: npm run runQA -- <jam-url> [options]',
+            'Usage: npm run runQA -- [jam-url] [options]',
+            '',
+            'If no URL is provided, an interactive menu will appear.',
             '',
             'Options:',
-            '  --list-jams              List recent Jam recordings',
+            '  --list-jams              List recent Jam recordings and exit',
             '  --mcp-fetch              Fetch context via MCP (fast, no scraper)',
             '  --out-playwright <dir>   Playwright output dir   (default: ./tests)',
             '  --out-cypress    <dir>   Cypress output dir      (default: ./cypress/e2e)',
@@ -70,7 +74,7 @@ function parseArgs(): ParsedArgs {
             '  --host <val>             Filter network by host (e.g. api.example.com)',
             '  --limit <num>            Limit network requests (default: 20)',
         ].join('\n'));
-        process.exit(1);
+        process.exit(0);
     }
 
     const get = (flag: string): string | undefined => {
@@ -114,8 +118,8 @@ function parseArgs(): ParsedArgs {
 
 async function main() {
     const args = parseArgs();
-    const { jamUrl, outPlaywright, outCypress, outFeatures, testUtils, noRun, listJams } = args;
-    let { mcpFetch } = args;
+    const { outPlaywright, outCypress, outFeatures, testUtils, noRun, listJams } = args;
+    let { jamUrl, mcpFetch } = args;
 
     const jamToken = process.env.JAM_TOKEN || "";
     if (jamUrl.includes("jam.dev") && jamToken && !mcpFetch) {
@@ -133,12 +137,63 @@ async function main() {
             console.log("\nRecent Jam recordings:");
             jams.forEach((j: any) => {
                 const title = j.title.substring(0, 50) + (j.title.length > 50 ? "..." : "");
-                console.log(`- [${j.createdAt}] ${title}`);
+                console.log(`- [${new Date(j.createdAt).toLocaleString()}] ${title}`);
                 console.log(`  URL: https://jam.dev/c/${j.id}`);
             });
             process.exit(0);
         } catch (err) {
             console.error("Failed to list Jams:", err);
+            process.exit(1);
+        }
+    }
+
+    if (!jamUrl) {
+        const { JamMcpClient } = await import("./mcp-client.js");
+        const client = new JamMcpClient();
+        console.log("Fetching recent Jams from MCP...");
+        try {
+            const result = await client.listJams(10);
+            const jams = (result as any).jams || [];
+
+            console.log("\nSelect a recent Jam recording to generate tests for:");
+            jams.forEach((j: any, i: number) => {
+                const title = j.title.substring(0, 50) + (j.title.length > 50 ? "..." : "");
+                console.log(`  ${i + 1}. [${new Date(j.createdAt).toLocaleString()}] ${title}`);
+            });
+            console.log(`  0. Or enter a Jam URL manually`);
+
+            const rl = readline.createInterface({ input, output });
+            let selection = await rl.question("\nEnter selection (1-10, 0, or paste URL): ");
+            selection = selection.trim();
+
+            if (selection === "0") {
+                selection = await rl.question("Enter Jam URL: ");
+                jamUrl = selection.trim();
+            } else if (/^\d+$/.test(selection)) {
+                const idx = parseInt(selection, 10) - 1;
+                if (idx >= 0 && idx < jams.length) {
+                    jamUrl = `https://jam.dev/c/${jams[idx].id}`;
+                }
+            } else if (selection.startsWith("http")) {
+                jamUrl = selection;
+            }
+
+            rl.close();
+
+            if (!jamUrl) {
+                console.error("No valid Jam selected. Exiting.");
+                process.exit(1);
+            }
+
+            // If they didn't explicitly pass --mcp-fetch, we can auto-enable it since we just proved we have MCP
+            if (!mcpFetch && jamToken) {
+                console.log("💡 Automatically enabling MCP fetch for selected Jam...");
+                mcpFetch = true;
+            }
+        } catch (err) {
+            console.error("Failed to list Jams:", err);
+            console.log("\nPlease provide a Jam URL via command line argument:");
+            console.log("npm run runQA -- <jam-url>");
             process.exit(1);
         }
     }
@@ -176,13 +231,18 @@ async function main() {
 
                     // Auto-isolate host if not specified
                     let hostFilter = args.host;
-                    if (!hostFilter && jam.title) {
-                        // Heuristic: look for the most specific-looking domain in the title
-                        // e.g. "Test digg.com" -> "digg.com"
-                        const match = jam.title.match(/([a-z0-9-]+\.[a-z]{2,})/i);
-                        if (match) {
-                            hostFilter = match[1];
-                            console.log(`   💡 Auto-isolating network to base domain: ${hostFilter}`);
+                    if (!hostFilter) {
+                        const originDomain = await client.getJamDomain(jam.id);
+                        if (originDomain) {
+                            hostFilter = originDomain;
+                            console.log(`   💡 Auto-isolating network to recording domain: ${hostFilter}`);
+                        } else if (jam.title) {
+                            // Fallback heuristic: look for the most specific-looking domain in the title
+                            const match = jam.title.match(/([a-z0-9-]+\.[a-z]{2,})/i);
+                            if (match) {
+                                hostFilter = match[1];
+                                console.log(`   💡 Auto-isolating network to base domain (from title): ${hostFilter}`);
+                            }
                         }
                     }
 
