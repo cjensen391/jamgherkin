@@ -98,20 +98,21 @@ export class ClaudeService {
          - Cypress: \`Cypress.env('TEST_EMAIL')\` / \`Cypress.env('TEST_PASSWORD')\`
          ${testUtils.length > 0 ? '- Use the provided login utility above if applicable.' : ''}
       ${framework === 'playwright' ? `7. **MANDATORY SELF-HEALING:** You MUST use:
-         import { aiClick, aiFill, aiPress, aiWaitFor, softWaitForURL } from '../src/self-heal.js';
-         - **CRITICAL**: EVERY interaction after \`page.goto\` MUST use \`aiClick\`, \`aiFill\`, \`aiPress\`, or \`aiWaitFor\`. 
-         - **STRICTLY FORBIDDEN**: NEVER use \`page.click()\`, \`page.fill()\`, \`locator.click()\`, \`locator.fill()\`, \`locator.press()\`, or \`page.waitForSelector()\`. These bypass healing!
+         import { aiClick, aiFill, aiPress, aiWaitFor, aiWaitForURL } from '../src/self-heal.js';
+         - **CRITICAL**: EVERY interaction after \`page.goto\` MUST use \`aiClick\`, \`aiFill\`, \`aiPress\`, \`aiWaitFor\`, or \`aiWaitForURL\`. 
+         - **STRICTLY FORBIDDEN**: NEVER use \`page.click()\`, \`page.fill()\`, \`locator.click()\`, \`locator.fill()\`, \`locator.press()\`, \`page.waitForSelector()\`, or \`page.waitForURL()\`. These bypass healing!
+         - **SELECTOR RULE**: ALWAYS pass a **string literal selector** directly to the \`ai*\` functions. NEVER pass a \`page.locator()\` object or a variable containing a locator.
+           * GOOD: \`await aiClick(page, "button#submit", "Submit form");\`
+           * BAD: \`const btn = page.locator("button#submit"); await aiClick(page, btn, ...);\`
          - **USAGE SIGNATURES (MANDATORY):**
            * \`await aiClick(page, "selector", "Action Description", { expectedUrlHint: "pattern", optional: true/false });\`
            * \`await aiFill(page, "selector", "Text to fill", "Action Description", { optional: true/false });\`
            * \`await aiPress(page, "selector", "Enter", "Action Description", { optional: true/false });\`
            * \`await aiWaitFor(page, "selector", "Waiting for XYZ", { state: 'visible', optional: true/false });\`
+           * \`await aiWaitForURL(page, /regex/);\`
          - **OPTIONAL FLAG**: Use \`optional: true\` for elements that might not always appear (e.g. cookie banners, newsletter popups, conditional modals). This allows the test to continue if the element is missing even after healing.
          - **NO BRANCHING LOGIC**: Do NOT use \`if (await locator.isVisible())\` or similar checks. Instead, use the \`optional\` flag inside the \`ai*\` call (e.g. \`aiClick(..., { optional: true })\`).
-         - **WAITING RULES:**
-           * NEVER use \`page.waitForLoadState('networkidle')\`.
-           * Use \`aiWaitFor\` instead of \`page.waitForSelector\`.
-         - URL Assertions: Use \`await softWaitForURL(page, /regex/);\` instead of standard \`page.waitForURL\`.
+         - **URL ASSERTIONS**: ALWAYS use \`await aiWaitForURL(page, /regex/);\` for navigation checks. It will automatically trigger a "Situation Audit" if the URL doesn't match.
          - Failures: Use \`expect.soft(page).toHaveURL(/regex/)\` for non-blocking assertions.
          - PREFER \`page.goto('URL', { waitUntil: 'domcontentloaded' })\` for initial navigation.
       8. **Final Instruction:** Output ONLY raw TypeScript code for Playwright. No markdown backticks. No intro text.`
@@ -146,12 +147,12 @@ export class ClaudeService {
         failedSelector: string,
         description: string,
         domContext: string,
-        previouslyTried: string[] = [],
+        previouslyTried: { selector: string; error?: string }[] = [],
         expectedUrlHint?: string,
         recordingContext?: string,
     ): Promise<string> {
         const alreadyTriedNote = previouslyTried.length > 0
-            ? `\nEXCLUDED SELECTORS (CRITICAL): Do NOT use any of these selectors. They have already been tried and failed. Your proposal MUST be different:\n${previouslyTried.map(s => `  - ${s}`).join('\n')}\n`
+            ? `\nEXCLUDED SELECTORS & ERRORS (CRITICAL): Do NOT use any of these. They have already been tried and yielded these errors. Your proposal MUST be different and avoid causing the same error:\n${previouslyTried.map(s => `  - Selector: "${s.selector}" -> Error: ${s.error || 'Unknown'}`).join('\n')}\n`
             : '';
 
         const urlHintNote = expectedUrlHint
@@ -162,7 +163,7 @@ export class ClaudeService {
             ? `\nRECORDING GROUND TRUTH: The recording showed this successful context brief during creation:\n${recordingContext}\nUse this to confirm the user's intended action and find the matching element in the current DOM.\n`
             : '';
 
-        const prompt = `Playwright selector "${failedSelector}" (for: "${description}") no longer matches. Find a replacement in this DOM.
+        const prompt = `Playwright interaction with "${failedSelector}" (action: "${description}") failed. Find a replacement selector in the current DOM.
 ${alreadyTriedNote}${urlHintNote}${recordingNote}
 IMPORTANT: The description above is an imperative test instruction, NOT the element's visible label. For example, "Click submit button to apply filters" means the element is probably labelled "Apply Filters" or "Submit" — do NOT use the full description phrase as text= content.
 
@@ -205,6 +206,55 @@ Reply with ONLY the raw selector string, no quotes, no explanation.`;
         } catch (e) {
             console.error("Failed to heal selector with Claude", e);
             throw e;
+        }
+    }
+
+    async auditNavigation(
+        expectedUrl: string | RegExp,
+        currentUrl: string,
+        domContext: string,
+        recordingContext?: string,
+    ): Promise<{ action: 'continue' | 'retry' | 'fail'; message?: string; recoverySelector?: string; recoveryAction?: string }> {
+        const expectedStr = expectedUrl instanceof RegExp ? expectedUrl.toString() : expectedUrl;
+        const recordingNote = recordingContext
+            ? `\nRECORDING GROUND TRUTH: The user intended to reach a URL matching "${expectedStr}". The recording says:\n${recordingContext}\n`
+            : '';
+
+        const prompt = `TEST AUDIT: A test expected the URL to match "${expectedStr}", but the current URL is "${currentUrl}".
+${recordingNote}
+Look at the current DOM and Recording context below. Decide the best course of action.
+
+Possible outcomes:
+1. "continue" — The current page is correct; the URL just has extra params, hashes, or a slightly different slug than expected.
+2. "retry" — We are on the wrong page because a navigation action was missed or failed (e.g. we didn't actually click a submit button, or we are still on the login page). Propose a recovery action.
+3. "fail" — We are on a completely wrong/error page and cannot recover.
+
+DOM (interactive elements only):
+${domContext}
+
+Return ONLY a JSON object: 
+{ 
+  "action": "continue" | "retry" | "fail", 
+  "message": "reasoning", 
+  "recoverySelector": "string if retry", 
+  "recoveryAction": "click" | "fill" | "press" 
+}`;
+
+        try {
+            const response = await this.anthropic.messages.create({
+                model: this.model,
+                max_tokens: 300,
+                messages: [{ role: "user", content: prompt }]
+            });
+
+            const block = response.content.find(block => block.type === 'text');
+            if (block && block.type === 'text') {
+                return JSON.parse(block.text.trim());
+            }
+            return { action: 'fail', message: 'Could not parse Claude response.' };
+        } catch (e) {
+            console.error("Failed to audit navigation", e);
+            return { action: 'fail', message: `Claude API error: ${e}` };
         }
     }
 

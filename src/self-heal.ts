@@ -237,31 +237,33 @@ export function setRecordingContext(brief: string) {
 
 export async function aiHealAction(
     page: Page,
-    originalSelector: string,
+    originalSelector: string | Locator,
     description: string,
     action: (locator: Locator) => Promise<void>,
     options?: { expectedUrlHint?: string; optional?: boolean },
 ) {
     const { expectedUrlHint, optional } = options || {};
+    const selectorStr = typeof originalSelector === 'string' ? originalSelector : originalSelector.toString();
+
     // ── Phase 0: Cache Check ─────────────────────────────────────────────────
     const cache = loadCache();
-    if (cache[originalSelector]) {
-        const cachedSelector = cache[originalSelector];
-        console.log(`⚡ Cache hit! Trying previously healed selector for '${originalSelector}': '${cachedSelector}'`);
+    if (cache[selectorStr]) {
+        const cachedSelector = cache[selectorStr];
+        console.log(`⚡ Cache hit! Trying previously healed selector for '${selectorStr}': '${cachedSelector}'`);
         const matched = await trySelector(page, cachedSelector, action, 2000);
         if (matched) {
             console.log(`✅ Success using cached healed selector.`);
             return;
         }
         console.warn(`⚠️ Cached selector '${cachedSelector}' no longer works. Proceeding with regular healing.`);
-        delete cache[originalSelector]; // Remove stale cache entry
+        delete cache[selectorStr]; // Remove stale cache entry
     }
 
     // ── Phase 1: Try the action with simple retries to handle transient flakiness
     let lastError: any;
     for (let i = 0; i < ACTION_RETRY_COUNT; i++) {
         try {
-            const locator = page.locator(originalSelector).first();
+            const locator = typeof originalSelector === 'string' ? page.locator(originalSelector).first() : originalSelector;
             // We wait for a very short time because if it's there we execute, if not we retry/heal.
             await locator.waitFor({ state: 'attached', timeout: 3000 });
             await action(locator);
@@ -275,22 +277,22 @@ export async function aiHealAction(
         }
     }
 
-    console.warn(`⚠️ aiHealAction: Element '${originalSelector}' (${description}) failed after ${ACTION_RETRY_COUNT} attempts. Initiating self-healing...`);
+    console.warn(`⚠️ aiHealAction: Element '${selectorStr}' (${description}) failed after ${ACTION_RETRY_COUNT} attempts. Initiating self-healing...`);
 
     // ── Phase 2: Try heuristic candidates (no Claude, no tokens) ──────────
-    const candidates = generateCandidateSelectors(originalSelector, description);
+    const candidates = generateCandidateSelectors(selectorStr, description);
     console.log(`🔎 Trying ${candidates.length} heuristic selector candidates before calling Claude...`);
 
-    const triedSelectors: string[] = [originalSelector];
+    const triedWithErrors: { selector: string; error?: string }[] = [{ selector: selectorStr, error: lastError?.message }];
     for (const candidate of candidates) {
         const matched = await trySelector(page, candidate, action);
-        triedSelectors.push(candidate);
         if (matched) {
             console.log(`✅ Healed with heuristic selector: '${candidate}'`);
-            console.warn(`💡 TIP: Update your test suite to use '${candidate}' instead of '${originalSelector}'`);
-            saveToCache(originalSelector, candidate);
+            console.warn(`💡 TIP: Update your test suite to use '${candidate}' instead of '${selectorStr}'`);
+            saveToCache(selectorStr, candidate);
             return;
         }
+        triedWithErrors.push({ selector: candidate });
     }
 
     console.log(`🤖 No heuristic matched. Falling back to Claude...`);
@@ -337,7 +339,7 @@ export async function aiHealAction(
         };
     });
 
-    const truncatedDom = `Current URL: ${currentUrl}\n\nVisible element labels (tag: "label"):\n${visibleLabels || '(none detected)'}\n\nHTML snippets:\n${domSnippets}`;
+    const domContext = `Current URL: ${currentUrl}\n\nVisible element labels (tag: "label"):\n${visibleLabels || '(none detected)'}\n\nHTML snippets:\n${domSnippets}`;
 
     if (activeRecordingContext) {
         console.log(`🔎 [Self-Heal] Using Recording Ground Truth (length: ${activeRecordingContext.length})`);
@@ -345,48 +347,50 @@ export async function aiHealAction(
 
     // ── Phase 4: Claude retry loop ─────────────────────────────────────────
     for (let attempt = 1; attempt <= MAX_HEAL_ATTEMPTS; attempt++) {
+        console.log(`🔍 Claude attempt ${attempt}/${MAX_HEAL_ATTEMPTS} (DOM length: ${domContext.length})`);
         try {
-            console.log(`🔍 Claude attempt ${attempt}/${MAX_HEAL_ATTEMPTS} (DOM length: ${truncatedDom.length})`);
-
-            const newSelector = await claude.healSelector(
-                originalSelector,
+            const proposedSelector = await claude.healSelector(
+                selectorStr,
                 description,
-                truncatedDom,
-                triedSelectors,
-                options?.expectedUrlHint,
+                domContext,
+                triedWithErrors,
+                expectedUrlHint,
                 activeRecordingContext,
             );
 
-            console.log(`🤖 Claude proposed: '${newSelector}'`);
+            console.log(`🤖 Claude proposed: '${proposedSelector}'`);
 
-            if (triedSelectors.includes(newSelector)) {
-                console.warn(`⚠️  Claude returned a selector already tried ('${newSelector}'). Skipping.`);
+            if (triedWithErrors.some(t => t.selector === proposedSelector)) {
+                console.warn(`⚠️  Claude returned a selector already tried ('${proposedSelector}'). Skipping.`);
+                triedWithErrors.push({ selector: proposedSelector, error: 'Already tried' });
                 continue;
             }
 
-            triedSelectors.push(newSelector);
-
-            const newLocator = page.locator(newSelector).first();
-            await newLocator.waitFor({ state: 'attached', timeout: 5000 });
-            await action(newLocator);
-            console.log(`✅ Healed on Claude attempt ${attempt}. Selector: '${newSelector}'`);
-            console.warn(`💡 TIP: Update your test suite to use '${newSelector}' instead of '${originalSelector}'`);
-            saveToCache(originalSelector, newSelector);
-            return;
-        } catch (err) {
+            const matched = await trySelector(page, proposedSelector, action, 5000);
+            if (matched) {
+                console.log(`✅ Healed on Claude attempt ${attempt}. Selector: '${proposedSelector}'`);
+                console.warn(`💡 TIP: Update your test suite to use '${proposedSelector}' instead of '${selectorStr}'`);
+                saveToCache(selectorStr, proposedSelector);
+                return;
+            } else {
+                triedWithErrors.push({ selector: proposedSelector, error: 'Timeout or interaction failure' });
+                console.log(`❌ Claude attempt ${attempt} failed. Retrying...`);
+            }
+        } catch (err: any) {
             lastError = err;
+            triedWithErrors.push({ selector: `Claude proposed (attempt ${attempt})`, error: err?.message || 'Unknown error' });
             console.warn(`❌ Claude attempt ${attempt} failed. Retrying... Error: ${err}`);
         }
     }
 
     if (optional) {
-        console.log(`ℹ️ Optional action for '${originalSelector}' (${description}) skipped after healing failed.`);
+        console.log(`ℹ️ Optional action for '${selectorStr}' (${description}) skipped after healing failed.`);
         return;
     }
 
     console.warn(
-        `⚠️ Self-healing exhausted all heuristics + ${MAX_HEAL_ATTEMPTS} Claude attempt(s) for '${originalSelector}' (${description}). Skipping action and continuing test.\n` +
-        `Tried: ${triedSelectors.join(', ')}\n` +
+        `⚠️ Self-healing exhausted all heuristics + ${MAX_HEAL_ATTEMPTS} Claude attempt(s) for '${selectorStr}' (${description}). Skipping action and continuing test.\n` +
+        `Tried: ${triedWithErrors.map(t => t.selector).join(', ')}\n` +
         `Last error: ${lastError}`
     );
 }
@@ -394,7 +398,7 @@ export async function aiHealAction(
 // Helper specific to clicking
 export async function aiClick(
     page: Page,
-    selector: string,
+    selector: string | Locator,
     description: string,
     options?: { expectedUrlHint?: string; optional?: boolean },
 ) {
@@ -404,21 +408,21 @@ export async function aiClick(
 }
 
 // Helper specific to filling text
-export async function aiFill(page: Page, selector: string, text: string, description: string, options?: { optional?: boolean }) {
+export async function aiFill(page: Page, selector: string | Locator, text: string, description: string, options?: { optional?: boolean }) {
     return aiHealAction(page, selector, description, async (loc) => {
         await loc.fill(text);
     }, options);
 }
 
 // Helper specific to pressing keys (e.g. 'Enter')
-export async function aiPress(page: Page, selector: string, key: string, description: string, options?: { optional?: boolean }) {
+export async function aiPress(page: Page, selector: string | Locator, key: string, description: string, options?: { optional?: boolean }) {
     return aiHealAction(page, selector, description, async (loc) => {
         await loc.press(key);
     }, options);
 }
 
 // self-healing wait
-export async function aiWaitFor(page: Page, selector: string, description: string, options?: { state?: 'visible' | 'hidden' | 'attached' | 'detached', timeout?: number; optional?: boolean }) {
+export async function aiWaitFor(page: Page, selector: string | Locator, description: string, options?: { state?: 'visible' | 'hidden' | 'attached' | 'detached', timeout?: number; optional?: boolean }) {
     return aiHealAction(page, selector, description, async (loc) => {
         await loc.waitFor({ state: options?.state ?? 'visible', timeout: options?.timeout ?? 5000 });
     }, options);
@@ -427,22 +431,70 @@ export async function aiWaitFor(page: Page, selector: string, description: strin
 
 
 /**
- * Soft version of page.waitForURL — if the URL doesn't match within the timeout,
- * logs a warning and continues instead of throwing. Use this after aiClick calls
- * that may have been self-healed, since the healed element might navigate somewhere
- * slightly different than expected.
+ * Self-healing wait for URL. 
+ * If the URL doesn't match within the timeout, Claude audits the situation.
  */
-export async function softWaitForURL(
+export async function aiWaitForURL(
     page: Page,
     pattern: string | RegExp,
     options?: { timeout?: number },
 ): Promise<boolean> {
+    const timeout = options?.timeout ?? 10000;
     try {
-        await page.waitForURL(pattern, { timeout: options?.timeout ?? 15000 });
+        await page.waitForURL(pattern, { timeout });
         return true;
     } catch {
-        const patternStr = pattern instanceof RegExp ? pattern.toString() : pattern;
-        console.warn(`⚠️ softWaitForURL: URL did not match ${patternStr} within timeout. Continuing to next step...`);
+        console.warn(`⚠️ aiWaitForURL: URL did not match expected pattern within ${timeout}ms. Triggering Situation Audit...`);
+
+        // ── Situation Audit ──────────────────────────────────────────────────────
+        const currentUrl = page.url();
+        const { domSnippets, visibleLabels } = await page.evaluate(() => {
+            const ELEMENT_CAP = 150;
+            const interactiveElements = Array.from(document.querySelectorAll('button, a, input, select, textarea, [role], [aria-label], [data-testid], [id], [name]'))
+                .slice(0, ELEMENT_CAP);
+
+            const domSnippets = interactiveElements.map(el => {
+                const clone = el.cloneNode(false) as HTMLElement;
+                return clone.outerHTML.substring(0, 300);
+            }).join('\n');
+
+            const visibleLabels = interactiveElements.map(el => {
+                const label = (el.getAttribute('aria-label') || el.getAttribute('placeholder') || el.textContent || '').trim();
+                const role = el.getAttribute('role') || el.tagName.toLowerCase();
+                return label ? `${role}: "${label.substring(0, 50)}"` : '';
+            }).filter(Boolean).join('\n');
+
+            return { domSnippets, visibleLabels };
+        });
+
+        const domContext = `Current URL: ${currentUrl}\n\nVisible element labels:\n${visibleLabels}\n\nHTML snippets:\n${domSnippets}`;
+
+        const audit = await claude.auditNavigation(pattern, currentUrl, domContext, activeRecordingContext);
+
+        if (audit.action === 'continue') {
+            console.log(`✅ [Self-Heal] Situation Audit: Claude says continue ("${audit.message}")`);
+            return true;
+        }
+
+        if (audit.action === 'retry' && audit.recoverySelector && audit.recoveryAction) {
+            console.log(`🔄 [Self-Heal] Situation Audit: Claude found a missed step: ${audit.recoveryAction} on "${audit.recoverySelector}" ("${audit.message}")`);
+
+            // Attempt recovery
+            try {
+                const loc = page.locator(audit.recoverySelector).first();
+                if (audit.recoveryAction === 'click') await loc.click();
+                else if (audit.recoveryAction === 'press') await loc.press('Enter');
+
+                // Wait again
+                await page.waitForURL(pattern, { timeout: 5000 });
+                console.log(`✅ [Self-Heal] Recovery successful!`);
+                return true;
+            } catch (e) {
+                console.error(`❌ [Self-Heal] Recovery attempt failed: ${e}`);
+            }
+        }
+
+        console.error(`❌ [Self-Heal] Situation Audit failed: ${audit.message}`);
         return false;
     }
 }
