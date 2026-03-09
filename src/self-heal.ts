@@ -1,7 +1,46 @@
 import type { Page, Locator } from 'playwright';
 import { ClaudeService } from './claude-service.js';
+import * as fs from 'fs';
+import * as path from 'path';
 
 const claude = new ClaudeService();
+
+const MAX_HEAL_ATTEMPTS = 5;
+const ACTION_RETRY_COUNT = 3;
+const ACTION_RETRY_DELAY = 1000;
+const CACHE_PATH = path.join('test-results', 'heal-cache.json');
+
+/**
+ * Loads the persistent selector cache from disk.
+ */
+function loadCache(): Record<string, string> {
+    try {
+        if (fs.existsSync(CACHE_PATH)) {
+            const data = fs.readFileSync(CACHE_PATH, 'utf-8');
+            return JSON.parse(data);
+        }
+    } catch (e) {
+        console.warn(`⚠️ Failed to load heal cache: ${e}`);
+    }
+    return {};
+}
+
+/**
+ * Saves a healed selector to the persistent cache.
+ */
+function saveToCache(originalSelector: string, healedSelector: string) {
+    try {
+        const cache = loadCache();
+        cache[originalSelector] = healedSelector;
+        const dir = path.dirname(CACHE_PATH);
+        if (!fs.existsSync(dir)) {
+            fs.mkdirSync(dir, { recursive: true });
+        }
+        fs.writeFileSync(CACHE_PATH, JSON.stringify(cache, null, 2), 'utf-8');
+    } catch (e) {
+        console.warn(`⚠️ Failed to save to heal cache: ${e}`);
+    }
+}
 
 /**
  * Generates a ranked list of heuristic selector candidates from the original
@@ -175,10 +214,11 @@ async function trySelector(
     page: Page,
     selector: string,
     action: (locator: Locator) => Promise<void>,
+    timeout: number = 300,
 ): Promise<boolean> {
     try {
         const loc = page.locator(selector).first();
-        await loc.waitFor({ state: 'attached', timeout: 300 });
+        await loc.waitFor({ state: 'attached', timeout });
         await action(loc);
         return true;
     } catch {
@@ -193,91 +233,105 @@ export async function aiHealAction(
     action: (locator: Locator) => Promise<void>,
     options?: { expectedUrlHint?: string },
 ) {
-    let locator = page.locator(originalSelector);
+    // ── Phase 0: Cache Check ─────────────────────────────────────────────────
+    const cache = loadCache();
+    if (cache[originalSelector]) {
+        const cachedSelector = cache[originalSelector];
+        console.log(`⚡ Cache hit! Trying previously healed selector for '${originalSelector}': '${cachedSelector}'`);
+        const matched = await trySelector(page, cachedSelector, action, 2000);
+        if (matched) {
+            console.log(`✅ Success using cached healed selector.`);
+            return;
+        }
+        console.warn(`⚠️ Cached selector '${cachedSelector}' no longer works. Proceeding with regular healing.`);
+        delete cache[originalSelector]; // Remove stale cache entry
+    }
 
-    try {
-        // We wait for a very short time because if it's there we execute, if not we heal immediately.
-        // For standard implicit waits, playwright normally waits 30s. We'll give it 5s max before healing.
-        await locator.waitFor({ state: 'attached', timeout: 5000 });
-        await action(locator);
-    } catch (e) {
-        console.warn(`⚠️ aiHealAction: Element '${originalSelector}' (${description}) failed. Initiating self-healing...`);
-
-        // ── Phase 1: Try heuristic candidates (no Claude, no tokens) ──────────
-        const candidates = generateCandidateSelectors(originalSelector, description);
-        console.log(`🔎 Trying ${candidates.length} heuristic selector candidates before calling Claude...`);
-
-        const triedSelectors: string[] = [originalSelector];
-        for (const candidate of candidates) {
-            const matched = await trySelector(page, candidate, action);
-            triedSelectors.push(candidate);
-            if (matched) {
-                console.log(`✅ Healed with heuristic selector: '${candidate}'`);
-                console.warn(`💡 TIP: Update your test suite to use '${candidate}' instead of '${originalSelector}'`);
-                return;
+    // ── Phase 1: Try the action with simple retries to handle transient flakiness
+    let lastError: any;
+    for (let i = 0; i < ACTION_RETRY_COUNT; i++) {
+        try {
+            const locator = page.locator(originalSelector).first();
+            // We wait for a very short time because if it's there we execute, if not we retry/heal.
+            await locator.waitFor({ state: 'attached', timeout: 3000 });
+            await action(locator);
+            return; // Success!
+        } catch (e: any) {
+            lastError = e;
+            // Short wait if this isn't the last attempt
+            if (i < ACTION_RETRY_COUNT - 1) {
+                await page.waitForTimeout(ACTION_RETRY_DELAY);
             }
         }
-        console.log(`🤖 No heuristic matched. Falling back to Claude...`);
+    }
 
-        // ── Phase 2: Extract compact DOM snapshot ──────────────────────────────
-        // Extract both the HTML snippets AND a plain visible-text summary so Claude
-        // can identify elements by their label even if they have no stable attributes.
-        const { domSnippets, visibleLabels, currentUrl } = await page.evaluate(() => {
-            const ELEMENT_CAP = 150;
-            const SNIPPET_CAP = 300;
+    console.warn(`⚠️ aiHealAction: Element '${originalSelector}' (${description}) failed after ${ACTION_RETRY_COUNT} attempts. Initiating self-healing...`);
 
-            const selectors = [
-                'button', 'a', 'input', 'select', 'textarea',
-                '[role]', '[aria-label]', '[data-testid]', '[name]', '[id]',
-            ];
-            const seen = new Set<string>();
-            const snippets: string[] = [];
-            const labels: string[] = [];   // human-readable: "button: All Digg", "a: Home"
+    // ── Phase 2: Try heuristic candidates (no Claude, no tokens) ──────────
+    const candidates = generateCandidateSelectors(originalSelector, description);
+    console.log(`🔎 Trying ${candidates.length} heuristic selector candidates before calling Claude...`);
 
-            for (const sel of selectors) {
-                if (snippets.length >= ELEMENT_CAP) break;
-                document.querySelectorAll<HTMLElement>(sel).forEach(el => {
-                    if (snippets.length >= ELEMENT_CAP) return;
-                    const key = el.tagName + (el.id || '') + (el.getAttribute('data-testid') || '') + el.textContent?.trim().slice(0, 40);
-                    if (seen.has(key)) return;
-                    seen.add(key);
+    const triedSelectors: string[] = [originalSelector];
+    for (const candidate of candidates) {
+        const matched = await trySelector(page, candidate, action);
+        triedSelectors.push(candidate);
+        if (matched) {
+            console.log(`✅ Healed with heuristic selector: '${candidate}'`);
+            console.warn(`💡 TIP: Update your test suite to use '${candidate}' instead of '${originalSelector}'`);
+            saveToCache(originalSelector, candidate);
+            return;
+        }
+    }
 
-                    // HTML snippet (existing approach)
-                    const shallow = el.cloneNode(false) as HTMLElement;
-                    if (el.children.length === 0) shallow.textContent = el.textContent?.trim().slice(0, 80) ?? '';
-                    else shallow.textContent = el.textContent?.trim().slice(0, 60) ?? '';
-                    shallow.removeAttribute('style');
-                    snippets.push(shallow.outerHTML.slice(0, SNIPPET_CAP));
+    console.log(`🤖 No heuristic matched. Falling back to Claude...`);
 
-                    // Visible text summary (new)
-                    const tag = el.tagName.toLowerCase();
-                    const text = el.textContent?.trim().replace(/\s+/g, ' ').slice(0, 80) ?? '';
-                    const ariaLabel = el.getAttribute('aria-label') ?? '';
-                    const label = ariaLabel || text;
-                    if (label) labels.push(`${tag}: "${label}"`);
-                });
-            }
+    // ── Phase 3: Extract compact DOM snapshot ──────────────────────────────
+    const { domSnippets, visibleLabels, currentUrl } = await page.evaluate(() => {
+        const ELEMENT_CAP = 150;
+        const SNIPPET_CAP = 300;
 
-            return {
-                domSnippets: snippets.join('\n'),
-                visibleLabels: labels.join('\n'),
-                currentUrl: location.href,
-            };
-        });
+        const selectors = [
+            'button', 'a', 'input', 'select', 'textarea',
+            '[role]', '[aria-label]', '[data-testid]', '[name]', '[id]',
+        ];
+        const seen = new Set<string>();
+        const snippets: string[] = [];
+        const labels: string[] = [];
 
-        const truncatedDom = `Current URL: ${currentUrl}
+        for (const sel of selectors) {
+            if (snippets.length >= ELEMENT_CAP) break;
+            document.querySelectorAll<HTMLElement>(sel).forEach(el => {
+                if (snippets.length >= ELEMENT_CAP) return;
+                const key = el.tagName + (el.id || '') + (el.getAttribute('data-testid') || '') + el.textContent?.trim().slice(0, 40);
+                if (seen.has(key)) return;
+                seen.add(key);
 
-Visible element labels (tag: "label"):
-${visibleLabels || '(none detected)'}
+                const shallow = el.cloneNode(false) as HTMLElement;
+                if (el.children.length === 0) shallow.textContent = el.textContent?.trim().slice(0, 80) ?? '';
+                else shallow.textContent = el.textContent?.trim().slice(0, 60) ?? '';
+                shallow.removeAttribute('style');
+                snippets.push(shallow.outerHTML.slice(0, SNIPPET_CAP));
 
-HTML snippets:
-${domSnippets}`;
+                const tag = el.tagName.toLowerCase();
+                const text = el.textContent?.trim().replace(/\s+/g, ' ').slice(0, 80) ?? '';
+                const ariaLabel = el.getAttribute('aria-label') ?? '';
+                const label = ariaLabel || text;
+                if (label) labels.push(`${tag}: "${label}"`);
+            });
+        }
 
-        // ── Phase 3: Claude retry loop ─────────────────────────────────────────
-        const MAX_HEAL_ATTEMPTS = 3;
-        let lastError: unknown = e;
+        return {
+            domSnippets: snippets.join('\n'),
+            visibleLabels: labels.join('\n'),
+            currentUrl: location.href,
+        };
+    });
 
-        for (let attempt = 1; attempt <= MAX_HEAL_ATTEMPTS; attempt++) {
+    const truncatedDom = `Current URL: ${currentUrl}\n\nVisible element labels (tag: "label"):\n${visibleLabels || '(none detected)'}\n\nHTML snippets:\n${domSnippets}`;
+
+    // ── Phase 4: Claude retry loop ─────────────────────────────────────────
+    for (let attempt = 1; attempt <= MAX_HEAL_ATTEMPTS; attempt++) {
+        try {
             console.log(`🔍 Claude attempt ${attempt}/${MAX_HEAL_ATTEMPTS} (DOM length: ${truncatedDom.length})`);
 
             const newSelector = await claude.healSelector(
@@ -288,7 +342,6 @@ ${domSnippets}`;
                 options?.expectedUrlHint,
             );
 
-
             console.log(`🤖 Claude proposed: '${newSelector}'`);
 
             if (triedSelectors.includes(newSelector)) {
@@ -298,26 +351,24 @@ ${domSnippets}`;
 
             triedSelectors.push(newSelector);
 
-            try {
-                const newLocator = page.locator(newSelector).first();
-                await newLocator.waitFor({ state: 'attached', timeout: 5000 });
-                await action(newLocator);
-                console.log(`✅ Healed on Claude attempt ${attempt}. Selector: '${newSelector}'`);
-                console.warn(`💡 TIP: Update your test suite to use '${newSelector}' instead of '${originalSelector}'`);
-                return; // success — exit the catch block
-            } catch (err) {
-                lastError = err;
-                console.warn(`❌ Claude attempt ${attempt} failed with selector '${newSelector}'. Retrying...`);
-            }
+            const newLocator = page.locator(newSelector).first();
+            await newLocator.waitFor({ state: 'attached', timeout: 5000 });
+            await action(newLocator);
+            console.log(`✅ Healed on Claude attempt ${attempt}. Selector: '${newSelector}'`);
+            console.warn(`💡 TIP: Update your test suite to use '${newSelector}' instead of '${originalSelector}'`);
+            saveToCache(originalSelector, newSelector);
+            return;
+        } catch (err) {
+            lastError = err;
+            console.warn(`❌ Claude attempt ${attempt} failed. Retrying... Error: ${err}`);
         }
-
-        console.warn(
-            `⚠️ Self-healing exhausted all heuristics + ${MAX_HEAL_ATTEMPTS} Claude attempt(s) for '${originalSelector}' (${description}). Skipping action and continuing test.\n` +
-            `Tried: ${triedSelectors.join(', ')}\n` +
-            `Last error: ${lastError}`
-        );
-        // Don't throw — allow the test to continue to the next step.
     }
+
+    console.warn(
+        `⚠️ Self-healing exhausted all heuristics + ${MAX_HEAL_ATTEMPTS} Claude attempt(s) for '${originalSelector}' (${description}). Skipping action and continuing test.\n` +
+        `Tried: ${triedSelectors.join(', ')}\n` +
+        `Last error: ${lastError}`
+    );
 }
 
 // Helper specific to clicking
@@ -332,13 +383,21 @@ export async function aiClick(
     }, options);
 }
 
-
 // Helper specific to filling text
 export async function aiFill(page: Page, selector: string, text: string, description: string) {
     return aiHealAction(page, selector, description, async (loc) => {
         await loc.fill(text);
     });
 }
+
+// Helper specific to pressing keys (e.g. 'Enter')
+export async function aiPress(page: Page, selector: string, key: string, description: string) {
+    return aiHealAction(page, selector, description, async (loc) => {
+        await loc.press(key);
+    });
+}
+
+
 
 /**
  * Soft version of page.waitForURL — if the URL doesn't match within the timeout,

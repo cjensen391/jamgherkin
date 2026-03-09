@@ -4,9 +4,25 @@ All notable changes to this project are documented here.
 
 ---
 
-## [Current] — 2026-03-08
+## [Current] — 2026-03-09
 
 ### ✨ New Features
+
+#### Persistent Selector Caching
+- Added `test-results/heal-cache.json` — healed selectors are now saved and shared across all tests in the same video run (and future runs).
+- **Phase 0 Cache Check**: Every interaction now checks the cache first, skipping AI calls and heuristics for previously fixed selectors.
+
+#### Hardened "Try" Loop (Self-Healing)
+- Increased `MAX_HEAL_ATTEMPTS` from 3 → 5 for Claude-powered healing.
+- Wrapped Claude generation and execution in a `try/catch` block to ensure a single API failure doesn't terminate the healing process.
+- Added **Transient Action Retries**: Performs a 3-attempt "quick retry" (with 1s delay) for individual actions to handle temporary UI states before triggering full self-healing.
+
+#### Reliable Submissions with `aiPress`
+- Restored the `aiPress` helper function to `src/self-heal.ts`.
+- Updated Claude and Gemini prompts to use `aiPress` for all keyboard interactions (e.g., 'Enter' for search).
+- Keyboard submissions are now fully covered by the self-healing and caching pipeline.
+
+### ✨ Previous Changes — 2026-03-08
 
 #### Cross-Repo Integration
 - Added `--out-playwright`, `--out-cypress`, `--out-features` CLI flags to write generated tests directly into another codebase

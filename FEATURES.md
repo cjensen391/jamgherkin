@@ -6,8 +6,8 @@ This project integrates [Jam.dev](https://jam.dev/) video summaries with Claude 
 
 ### 1. Automated Test Generation
 Pass a Jam.dev recording URL and the system writes test suites across all three formats.
-- **Playwright (`*.spec.ts`)**: Complete functional tests using `aiClick`/`aiFill` self-healing wrappers.
-- **Cypress (`*.cy.ts`)**: Cypress-equivalent UI tests with network intercepts for async flows.
+- **Playwright (`*.spec.ts`)**: Complete functional tests using `aiClick`/`aiFill`/`aiPress` self-healing wrappers.
+- **Cypress (`*.cy.ts`)**: Cypress-equivalent UI tests with network intercepts and keystroke-accurate typing.
 - **Gherkin (`*.feature`)**: BDD-style Given/When/Then scenarios in plain business language.
 
 *(Use Case: A QA engineer or PM records a bug in Jam. The system instantly generates automated regressions for Playwright and Cypress, closing the gap between manual reporting and automation.)*
@@ -17,21 +17,21 @@ UI locators break when structure or class names change. JamGherkin mitigates fla
 
 **Healing runs in two phases:**
 
-**Phase 1 — Heuristic (no AI, no tokens):**
-Derives 30+ selector candidates from the original selector string and the element description:
-- `data-testid`, `data-cy`, `data-test` slug variations
-- Playwright `role=` selectors with `name=` (using the element's inferred label, not the full instruction)
-- `aria-label`, `aria-labelledby`
-- Visible text (`text=`, `:has-text()`) — stripped of leading action verbs so "Click submit button" → tries `button:has-text("submit")`
-- Semantic shortcuts: `input[type=email]`, `input[type=password]`, `button[type=submit]`, `[role=searchbox]`, etc.
-- ID, name, and type attributes extracted from the original selector
+**Healing runs in four phases:**
 
-Each candidate is tried with a 300ms probe — fast enough never to blow the test timeout.
+**Phase 0 — Cache Hit:**
+Checks `test-results/heal-cache.json` for a previously successful fix for this selector. If found, it's tried immediately, skipping all AI calls and heuristics.
 
-**Phase 2 — Claude (up to 3 attempts):**
-If no heuristic works, Claude receives a compact DOM snapshot (interactive elements only, ~5k chars) and is told:
-- Which selectors already failed (so it doesn't repeat them)
-- That descriptions are imperative instructions, not element labels
+**Phase 1 — Transient Retries:**
+Performs 3 quick attempts with a 1s delay. This handles "blink and you miss it" UI states (loading spinners, finishing animations) where the element is technically present but not yet interactive.
+
+**Phase 2 — Heuristic (no AI, no tokens):**
+Derives 30+ selector candidates from the original selector string and the element description. Each is tried with a 300ms probe.
+
+**Phase 3 — Claude (up to 5 attempts):**
+If no heuristic works, Claude receives a compact DOM snapshot. It is told which selectors already failed and uses a higher attempt limit (5) to find the most resilient fix. Successful fixes are saved to the persistent cache.
+
+*(Use Case: A developer renames a CSS class or moves an element. The first test to hit it calls Claude. Every subsequent test in the same video run uses the cached fix instantly — no extra AI cost or delay.)*
 - To prefer stable attributes (`data-testid`, role, aria) and never use Tailwind/CSS-Modules class names
 
 *(Use Case: A developer renames a CSS class from `.btn-primary` to a Tailwind utility chain. The `aiClick` wrapper finds the button via `role=button[name="Sign In"]` in the heuristic phase — no API call needed.)*
@@ -111,9 +111,9 @@ Switch providers by changing the service instantiated in `index.ts`. Requires th
 
 ### Self-Healing Improvements
 - [ ] Auto-update test source files in-place when a selector is healed (persists the fix for next run)
-- [ ] Write healed selectors to a `heal-log.json` for team review and audit
-- [ ] Cache DOM snapshots between heal attempts (avoid re-evaluating on the same page state)
-- [ ] Increase selector diversity by querying visible text from page at heal time
+- [x] Write healed selectors to a persistent `heal-cache.json` for reuse across runs
+- [x] Harden "Try" loop to ensure AI attempts continue through intermittent API failures
+- [x] Add transient retry loop for initial actions (handles loading/animations)
 - [ ] Validate Claude's proposed selector against the selector priority rules before trying it
 
 ### Test Generation Improvements

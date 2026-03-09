@@ -9,9 +9,10 @@ Powered by **Claude** (default) or **Gemini** — both providers are fully suppo
 ## Features
 - 🤖 **Multi-Framework Output**: Automatically generates tests for Playwright (`.spec.ts`), Cypress (`.cy.ts`), and Gherkin (`.feature`).
 - 🧠 **Dual AI Providers**: Powered by **Claude** (default) or **Gemini** — both support Gherkin, self-healing wrappers, test-utils injection, auth env vars, and clean Gherkin prompts.
-- 🛠️ **AI Self-Healing (Playwright)**: Emits custom `aiClick` and `aiFill` wrappers instead of standard locators. If the DOM structure changes and breaks the test, the system:
+- 🛠️ **AI Self-Healing (Playwright)**: Emits custom `aiClick`, `aiFill`, and `aiPress` wrappers instead of standard locators. If the DOM structure changes and breaks the test, the system:
   1. Tries **30+ heuristic selector candidates** (data-testid, role, aria-label, text, type patterns) with no AI cost.
-  2. Falls back to **Claude** (up to 3 attempts) if heuristics fail, passing previously-tried selectors so it never repeats a guess.
+  2. **Transient Retries**: Performs a 3-attempt "quick retry" (1s delay) for transient UI states before triggering AI.
+  3. **AI Healing (Claude)**: Falls back to **Claude** (up to 5 attempts) if heuristics fail, using a persistent cache to skip redundant AI calls.
 - 🔎 **Token-Efficient DOM Extraction**: Sends only interactive elements (buttons, inputs, links, roles, aria- and data- attributes) to Claude — typically 5k chars vs 50k for the full body.
 - 🔐 **Intelligent Security**: Automatically redacts passwords, JWTs, and API keys from scraped Jam data before it reaches Claude. Auth flows inject `TEST_EMAIL` and `TEST_PASSWORD` from your `.env`.
 - 📄 **Clean Gherkin**: Noise-filters console errors, CDN URLs, timestamps, and browser metadata before generation so Gherkin reads as business language, not a debug log.
@@ -80,7 +81,7 @@ cd ../other-repo && npm link jamgherkin
 ```
 Then in tests:
 ```ts
-import { aiClick, aiFill } from 'jamgherkin/self-heal';
+import { aiClick, aiFill, aiPress } from 'jamgherkin/self-heal';
 ```
 
 ### What Happens?
@@ -95,16 +96,17 @@ import { aiClick, aiFill } from 'jamgherkin/self-heal';
 ## The Self-Healing Runtime
 When running Playwright tests, if a selector breaks:
 
-1. **Heuristic phase (free, fast):** 30+ candidates are derived from the element description — slugged `data-testid`, role selectors, aria-labels, visible text, and common semantic patterns (`input[type=email]`, `button[type=submit]`, etc.). Each is tried with a 300ms probe timeout.
-2. **Claude phase (3 attempts):** Claude reads a compact DOM snapshot (interactive elements only) and proposes a replacement, being told which selectors already failed so it doesn't repeat them.
+1. **Transient retry phase:** Performs 3 quick attempts with a 1s delay to handle temporary loading states or animations.
+2. **Heuristic phase (free, fast):** 30+ candidates are derived from the element description — slugged `data-testid`, role selectors, aria-labels, visible text, and common semantic patterns (`input[type=email]`, `button[type=submit]`, etc.).
+3. **Claude phase (5 attempts):** Claude reads a compact DOM snapshot and proposes a replacement. Results are cached in `test-results/heal-cache.json` and shared across all tests in the run to avoid redundant AI calls.
 3. If healed, the new selector is logged with a `💡 TIP` to update the test suite.
 
 ## Planned / TODO
 - [ ] Auto-update test source files in-place when a healed selector is found
-- [ ] Record healed selectors to a `heal-log.json` for audit and review
+- [x] Record healed selectors to a persistent `heal-cache.json` for reuse across runs
+- [x] Record user keyboard interactions (keystrokes) directly from Jam recording data
 - [ ] Support passing multiple Jam URLs in one run to batch-generate tests
 - [ ] Add a `--gherkin-only` flag to skip test generation
 - [ ] Cypress self-healing wrappers (`cyClick`, `cyFill`) analogous to the Playwright ones
-- [ ] Cache DOM snapshots between heal attempts to avoid re-evaluating on the same page state
 - [ ] GitHub Actions workflow example for running generated tests in CI
 - [ ] Web UI / dashboard to view generated tests and healing history

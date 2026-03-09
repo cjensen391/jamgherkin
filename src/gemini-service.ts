@@ -85,20 +85,26 @@ export class GeminiService {
            b. Wait for input visibility.
            c. \`aiFill\` the input.
            d. Wait 300ms.
-           e. Press \`Enter\` on the input element.
+           e. \`aiPress\` 'Enter' on the input element.
       5. Include comments explaining key steps.
       6. If the flow involves authentication, use environment variables:
          - Playwright: \`process.env.TEST_EMAIL\` / \`process.env.TEST_PASSWORD\`
          - Cypress: \`Cypress.env('TEST_EMAIL')\` / \`Cypress.env('TEST_PASSWORD')\`
          ${testUtils.length > 0 ? '- Use the provided login utility above if applicable.' : ''}
       ${framework === 'playwright' ? `7. **MANDATORY SELF-HEALING:** You MUST use:
-         import { aiClick, aiFill, softWaitForURL } from '../src/self-heal.js';
-         - **CRITICAL**: EVERY interaction after \`page.goto\` MUST use \`aiClick\` or \`aiFill\`. 
-         - NEVER use \`page.click()\`, \`page.fill()\`, \`locator.click()\`, or \`locator.fill()\`.
-         - Usage: \`await aiClick(page, "selector", "Action Description", { expectedUrlHint: "pattern" });\`
+         import { aiClick, aiFill, aiPress, softWaitForURL } from '../src/self-heal.js';
+         - **CRITICAL**: EVERY interaction after \`page.goto\` MUST use \`aiClick\`, \`aiFill\`, or \`aiPress\`. 
+         - NEVER use \`page.click()\`, \`page.fill()\`, \`locator.click()\`, \`locator.fill()\`, or \`locator.press()\`.
+         - **USAGE SIGNATURES (MANDATORY):**
+           * \`await aiClick(page, "selector", "Action Description", { expectedUrlHint: "pattern" });\`
+           * \`await aiFill(page, "selector", "Text to fill", "Action Description");\`
+           * \`await aiPress(page, "selector", "Enter", "Action Description");\`
+         - **WAITING RULES:**
+           * NEVER use \`page.waitForLoadState('networkidle')\`. It is unreliable and causes hangs.
+           * ALWAYS use \`page.waitForLoadState('domcontentloaded')\` or \`page.waitForSelector("selector", { state: 'visible' })\`.
          - URL Assertions: Use \`await softWaitForURL(page, /regex/);\` instead of standard \`page.waitForURL\`.
          - Failures: Use \`expect.soft(page).toHaveURL(/regex/)\` for non-blocking assertions.
-         - PREFER \`page.goto('URL', { waitUntil: 'domcontentloaded' })\` if the recording shows direct navigation via History API.
+         - PREFER \`page.goto('URL', { waitUntil: 'domcontentloaded' })\` for initial navigation.
       8. **Final Instruction:** Output ONLY raw TypeScript code for Playwright. No markdown backticks. No intro text.`
       : `7. **CYPRESS STEPS:** Identify key network requests and use cy.intercept/cy.wait.
          - DO NOT import describe/it/expect — they are globals.
