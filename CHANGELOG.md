@@ -14,11 +14,14 @@ All notable changes to this project are documented here.
 - Added `--list-jams` to browse recent team recordings from the terminal.
 
 #### Universal Healing & Ground Truth 🛠️
-- **aiWaitFor**: Introduced self-healing wait steps to prevent test crashes on simple timeouts.
+- **aiWaitForURL & Situation Audit**: Replaced passive waiting with an active audit. If a URL doesn't match, Claude analyzes the live DOM vs. the recording to decide whether to continue, retry a missed step, or fail.
+- **Error-Aware Healing**: Playwright error messages (e.g., "Element is not an input") are now passed to Claude during healing to prevent repetitive invalid suggestions.
+- **aiWaitFor**: Introduced self-healing wait steps for elements to prevent test crashes on simple timeouts.
 - **Optional Actions**: Added an `optional` flag to `aiClick`, `aiFill`, etc., allowing tests to bypass non-essential UI (like cookie banners) gracefully.
+- **Locator Support**: All `ai*` actions now support passing both string selectors and Playwright `Locator` objects.
 - **Ground Truth Reference**: Self-healing now uses the original Jam technical brief as a reference for 100% accurate selector recovery.
 - **Fail-Fast Loops**: tracks and excludes already-tried selectors to prevent AI "dead-ends" during recovery.
-- **Generation Hardening**: Updated AI prompts to strictly forbid standard Playwright interactions, ensuring 100% healing coverage.
+- **Generation Hardening**: Updated AI prompts with a strict **Selector Rule**: forcing string literals and forbidding `page.locator()` variables to ensure 100% healing coverage.
 
 ### ✨ Previous Changes — 2026-03-08
 

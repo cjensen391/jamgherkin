@@ -6,7 +6,7 @@ This project integrates [Jam.dev](https://jam.dev/) video summaries with Claude 
 
 ### 1. Automated Test Generation
 Pass a Jam.dev recording URL and the system writes test suites across all three formats.
-- **Playwright (`*.spec.ts`)**: Complete functional tests using `aiClick`/`aiFill`/`aiPress` self-healing wrappers.
+- **Playwright (`*.spec.ts`)**: Complete functional tests using `aiClick`/`aiFill`/`aiPress`/`aiWaitFor`/`aiWaitForURL` self-healing wrappers.
 - **Cypress (`*.cy.ts`)**: Cypress-equivalent UI tests with network intercepts and keystroke-accurate typing.
 - **Gherkin (`*.feature`)**: BDD-style Given/When/Then scenarios in plain business language.
 
@@ -17,6 +17,15 @@ Pass a Jam.dev recording URL and the system writes test suites across all three 
 - **Automatic Domain Isolation**: By default, the tool extracts the target domain (e.g., `digg.com`) and silences common noisy hosts (like `jam.dev` analytics).
 - **Surgical Network Filtering**: Use CLI flags like `--status-code 5xx` or `--content-type application/json` to prune the technical "firehose" before it reaches the AI.
 - **Search & List**: Use `--list-jams` or search by title to find recordings without leaving the terminal.
+- **Auto-enable**: System automatically detects Jam URLs and enables context fetching if `JAM_TOKEN` is found.
+
+### 9. Navigation & Assertion Healing (aiWaitForURL)
+- **Active Navigation Auditing**: Traditional `waitForURL` simply timeouts if a match isn't found. `aiWaitForURL` triggers a **Situation Audit** upon failure.
+- **Claude "Truth" Comparison**: Claude compares the current live URL and DOM against the original recording's technical brief.
+- **Intelligent Recovery**:
+  - **Minor Variation**: If the URL only differs by a non-critical slug or parameter, Claude marking the step as "Success" allows the test to proceed.
+  - **Missed Step**: If a navigation step was missed (e.g. a click didn't fire), Claude identifies the missing action and the system can backtrack to recover.
+  - **Terminal Failure**: Only fails if there is no path forward, preventing fragile timing-related crashes.
 
 ---
 
@@ -37,8 +46,9 @@ Performs 3 quick attempts with a 1s delay. This handles "blink and you miss it" 
 Derives 30+ selector candidates from the original selector string and the element description. Each is tried with a 300ms probe.
 
 **Phase 3 — Ground Truth Healing (Claude-powered):**
-If no heuristic works, Claude receives a compact DOM snapshot *and* the original "Ground Truth" brief from the Jam recording.
+If no heuristic works, Claude receives a compact DOM snapshot, the **Live Playwright Error**, and the original **"Ground Truth" brief** from the Jam recording.
 - **Context-Aware Recovery**: Claude uses the original technical context (what the user was doing, what network calls were made) to identify the intended element in the current, potentially broken DOM.
+- **Error-Awareness**: Passes specific errors (e.g., `Element is not visible`, `is not an input`) to Claude so it can avoid suggesting elements that would cause the same failure.
 - **Fail-Fast Loops**: Tracks already-tried selectors to prevent AI "dead-ends."
 - **Attempt Limit**: Uses up to 5 attempts to find the most resilient fix.
 
