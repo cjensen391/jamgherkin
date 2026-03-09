@@ -98,16 +98,19 @@ export class ClaudeService {
          - Cypress: \`Cypress.env('TEST_EMAIL')\` / \`Cypress.env('TEST_PASSWORD')\`
          ${testUtils.length > 0 ? '- Use the provided login utility above if applicable.' : ''}
       ${framework === 'playwright' ? `7. **MANDATORY SELF-HEALING:** You MUST use:
-         import { aiClick, aiFill, aiPress, softWaitForURL } from '../src/self-heal.js';
-         - **CRITICAL**: EVERY interaction after \`page.goto\` MUST use \`aiClick\`, \`aiFill\`, or \`aiPress\`. 
-         - NEVER use \`page.click()\`, \`page.fill()\`, \`locator.click()\`, \`locator.fill()\`, or \`locator.press()\`.
+         import { aiClick, aiFill, aiPress, aiWaitFor, softWaitForURL } from '../src/self-heal.js';
+         - **CRITICAL**: EVERY interaction after \`page.goto\` MUST use \`aiClick\`, \`aiFill\`, \`aiPress\`, or \`aiWaitFor\`. 
+         - **STRICTLY FORBIDDEN**: NEVER use \`page.click()\`, \`page.fill()\`, \`locator.click()\`, \`locator.fill()\`, \`locator.press()\`, or \`page.waitForSelector()\`. These bypass healing!
          - **USAGE SIGNATURES (MANDATORY):**
-           * \`await aiClick(page, "selector", "Action Description", { expectedUrlHint: "pattern" });\`
-           * \`await aiFill(page, "selector", "Text to fill", "Action Description");\`
-           * \`await aiPress(page, "selector", "Enter", "Action Description");\`
+           * \`await aiClick(page, "selector", "Action Description", { expectedUrlHint: "pattern", optional: true/false });\`
+           * \`await aiFill(page, "selector", "Text to fill", "Action Description", { optional: true/false });\`
+           * \`await aiPress(page, "selector", "Enter", "Action Description", { optional: true/false });\`
+           * \`await aiWaitFor(page, "selector", "Waiting for XYZ", { state: 'visible', optional: true/false });\`
+         - **OPTIONAL FLAG**: Use \`optional: true\` for elements that might not always appear (e.g. cookie banners, newsletter popups, conditional modals). This allows the test to continue if the element is missing even after healing.
+         - **NO BRANCHING LOGIC**: Do NOT use \`if (await locator.isVisible())\` or similar checks. Instead, use the \`optional\` flag inside the \`ai*\` call (e.g. \`aiClick(..., { optional: true })\`).
          - **WAITING RULES:**
-           * NEVER use \`page.waitForLoadState('networkidle')\`. It is unreliable and causes hangs.
-           * ALWAYS use \`page.waitForLoadState('domcontentloaded')\` or \`page.waitForSelector("selector", { state: 'visible' })\`.
+           * NEVER use \`page.waitForLoadState('networkidle')\`.
+           * Use \`aiWaitFor\` instead of \`page.waitForSelector\`.
          - URL Assertions: Use \`await softWaitForURL(page, /regex/);\` instead of standard \`page.waitForURL\`.
          - Failures: Use \`expect.soft(page).toHaveURL(/regex/)\` for non-blocking assertions.
          - PREFER \`page.goto('URL', { waitUntil: 'domcontentloaded' })\` for initial navigation.

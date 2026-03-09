@@ -240,8 +240,9 @@ export async function aiHealAction(
     originalSelector: string,
     description: string,
     action: (locator: Locator) => Promise<void>,
-    options?: { expectedUrlHint?: string },
+    options?: { expectedUrlHint?: string; optional?: boolean },
 ) {
+    const { expectedUrlHint, optional } = options || {};
     // ── Phase 0: Cache Check ─────────────────────────────────────────────────
     const cache = loadCache();
     if (cache[originalSelector]) {
@@ -378,6 +379,11 @@ export async function aiHealAction(
         }
     }
 
+    if (optional) {
+        console.log(`ℹ️ Optional action for '${originalSelector}' (${description}) skipped after healing failed.`);
+        return;
+    }
+
     console.warn(
         `⚠️ Self-healing exhausted all heuristics + ${MAX_HEAL_ATTEMPTS} Claude attempt(s) for '${originalSelector}' (${description}). Skipping action and continuing test.\n` +
         `Tried: ${triedSelectors.join(', ')}\n` +
@@ -390,7 +396,7 @@ export async function aiClick(
     page: Page,
     selector: string,
     description: string,
-    options?: { expectedUrlHint?: string },
+    options?: { expectedUrlHint?: string; optional?: boolean },
 ) {
     return aiHealAction(page, selector, description, async (loc) => {
         await loc.click();
@@ -398,17 +404,24 @@ export async function aiClick(
 }
 
 // Helper specific to filling text
-export async function aiFill(page: Page, selector: string, text: string, description: string) {
+export async function aiFill(page: Page, selector: string, text: string, description: string, options?: { optional?: boolean }) {
     return aiHealAction(page, selector, description, async (loc) => {
         await loc.fill(text);
-    });
+    }, options);
 }
 
 // Helper specific to pressing keys (e.g. 'Enter')
-export async function aiPress(page: Page, selector: string, key: string, description: string) {
+export async function aiPress(page: Page, selector: string, key: string, description: string, options?: { optional?: boolean }) {
     return aiHealAction(page, selector, description, async (loc) => {
         await loc.press(key);
-    });
+    }, options);
+}
+
+// self-healing wait
+export async function aiWaitFor(page: Page, selector: string, description: string, options?: { state?: 'visible' | 'hidden' | 'attached' | 'detached', timeout?: number; optional?: boolean }) {
+    return aiHealAction(page, selector, description, async (loc) => {
+        await loc.waitFor({ state: options?.state ?? 'visible', timeout: options?.timeout ?? 5000 });
+    }, options);
 }
 
 
