@@ -177,11 +177,12 @@ async function main() {
                     // Auto-isolate host if not specified
                     let hostFilter = args.host;
                     if (!hostFilter && jam.title) {
-                        // Heuristic: look for something that looks like a domain in the title
+                        // Heuristic: look for the most specific-looking domain in the title
+                        // e.g. "Test digg.com" -> "digg.com"
                         const match = jam.title.match(/([a-z0-9-]+\.[a-z]{2,})/i);
                         if (match) {
                             hostFilter = match[1];
-                            console.log(`   💡 Auto-isolating network to host: ${hostFilter}`);
+                            console.log(`   💡 Auto-isolating network to base domain: ${hostFilter}`);
                         }
                     }
 
