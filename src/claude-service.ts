@@ -147,8 +147,8 @@ export class ClaudeService {
         expectedUrlHint?: string,
         recordingContext?: string,
     ): Promise<string> {
-        const alreadyTriedNote = previouslyTried.length > 1
-            ? `\nDo NOT use any of these selectors — they have already been tried and failed:\n${previouslyTried.map(s => `  - ${s}`).join('\n')}\n`
+        const alreadyTriedNote = previouslyTried.length > 0
+            ? `\nEXCLUDED SELECTORS (CRITICAL): Do NOT use any of these selectors. They have already been tried and failed. Your proposal MUST be different:\n${previouslyTried.map(s => `  - ${s}`).join('\n')}\n`
             : '';
 
         const urlHintNote = expectedUrlHint
@@ -156,7 +156,7 @@ export class ClaudeService {
             : '';
 
         const recordingNote = recordingContext
-            ? `\nRECORDING GROUND TRUTH: The recording showed this successful context brief during creation:\n${recordingContext}\nUse this to confirm the user's intended action and find the matching element in the current DOM.\n`
+            ? `\nRECORDING GROUND TRUTH (ORIGIN DATA):\n${recordingContext}\n\nINSTRUCTION: The recording context above shows exactly what was happening when this test was first created. Use it to identify the IDENTITY of the element (e.g., its original label, its location relative to other elements, or the network requests it triggered). Your goal is to find the element in the CURRENT DOM that performs this same role.\n`
             : '';
 
         const prompt = `Playwright selector "${failedSelector}" (for: "${description}") no longer matches. Find a replacement in this DOM.

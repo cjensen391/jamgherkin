@@ -174,10 +174,21 @@ async function main() {
                         .replace(/[^a-z0-9]+/g, '-')
                         .replace(/(^-|-$)/g, '') || jamId;
 
+                    // Auto-isolate host if not specified
+                    let hostFilter = args.host;
+                    if (!hostFilter && jam.title) {
+                        // Heuristic: look for something that looks like a domain in the title
+                        const match = jam.title.match(/([a-z0-9-]+\.[a-z]{2,})/i);
+                        if (match) {
+                            hostFilter = match[1];
+                            console.log(`   💡 Auto-isolating network to host: ${hostFilter}`);
+                        }
+                    }
+
                     const mcpContext = await client.getJamContext(jam.id, {
                         statusCode: args.statusCode,
                         contentType: args.contentType,
-                        host: args.host,
+                        host: hostFilter,
                         limit: args.limit
                     });
                     extractedContext = `Url: ${jamUrl}\n\nTechnical context from Jam API:\n${mcpContext}`;

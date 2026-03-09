@@ -338,6 +338,10 @@ export async function aiHealAction(
 
     const truncatedDom = `Current URL: ${currentUrl}\n\nVisible element labels (tag: "label"):\n${visibleLabels || '(none detected)'}\n\nHTML snippets:\n${domSnippets}`;
 
+    if (activeRecordingContext) {
+        console.log(`🔎 [Self-Heal] Using Recording Ground Truth (length: ${activeRecordingContext.length})`);
+    }
+
     // ── Phase 4: Claude retry loop ─────────────────────────────────────────
     for (let attempt = 1; attempt <= MAX_HEAL_ATTEMPTS; attempt++) {
         try {
