@@ -124,11 +124,11 @@ When running Playwright tests, if a selector breaks:
 5. If healed, the new selector is logged with a `💡 TIP` to update the test suite.
 
 ## Planned / TODO
-- [ ] Auto-update test source files in-place when a healed selector is found
 - [x] Record healed selectors to a persistent `heal-cache.json` for reuse across runs
 - [x] Record user keyboard interactions (keystrokes) directly from Jam recording data
-- [ ] Support passing multiple Jam URLs in one run to batch-generate tests
-- [ ] Add a `--gherkin-only` flag to skip test generation
+- [x] Implement `aiWaitFor` for self-healing element waits
+- [x] Implement `aiWaitForURL` for self-healing navigation audits
+- [x] Add transient retry loop for initial actions (handles loading/animations)
 - [ ] Cypress self-healing wrappers (`cyClick`, `cyFill`) analogous to the Playwright ones
 - [ ] GitHub Actions workflow example for running generated tests in CI
 - [ ] Web UI / dashboard to view generated tests and healing history

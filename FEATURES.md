@@ -130,11 +130,12 @@ Switch providers by changing the service instantiated in `index.ts`. Requires th
 ## 📋 Planned / TODO
 
 ### Self-Healing Improvements
-- [ ] Auto-update test source files in-place when a selector is healed (persists the fix for next run)
 - [x] Write healed selectors to a persistent `heal-cache.json` for reuse across runs
-- [x] Harden "Try" loop to ensure AI attempts continue through intermittent API failures
 - [x] Add transient retry loop for initial actions (handles loading/animations)
-- [ ] Validate Claude's proposed selector against the selector priority rules before trying it
+- [x] Implement Navigation & Assertion Healing (`aiWaitForURL`)
+- [x] Implement Error-Aware Healing (passing Playwright errors to AI)
+- [ ] Auto-update test source files in-place when a selector is healed
+- [ ] Validate Claude's proposed selector against priority rules
 
 ### Test Generation Improvements
 - [ ] Cypress self-healing wrappers (`cyClick`, `cyFill`) analogous to Playwright ones
