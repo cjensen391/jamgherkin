@@ -39,6 +39,7 @@ interface ParsedArgs {
     noRun: boolean;
     listJams: boolean;
     mcpFetch: boolean;
+    jamToken?: string;
 }
 
 function parseArgs(): ParsedArgs {
@@ -101,7 +102,14 @@ function parseArgs(): ParsedArgs {
 
 async function main() {
     const args = parseArgs();
-    const { jamUrl, outPlaywright, outCypress, outFeatures, testUtils, noRun, listJams, mcpFetch } = args;
+    const { jamUrl, outPlaywright, outCypress, outFeatures, testUtils, noRun, listJams } = args;
+    let { mcpFetch } = args;
+
+    const jamToken = process.env.JAM_TOKEN || "";
+    if (jamUrl.includes("jam.dev") && jamToken && !mcpFetch) {
+        console.log("💡 Jam URL detected and JAM_TOKEN found. Automatically enabling --mcp-fetch...");
+        mcpFetch = true;
+    }
 
     if (listJams) {
         const { JamMcpClient } = await import("./mcp-client.js");
@@ -249,7 +257,12 @@ async function main() {
         }
 
         console.log("\n3. Generating Playwright test with Claude...");
-        const playwrightTest = await claude.generateTest(extractedContext, "playwright", testUtils);
+        let playwrightTest = await claude.generateTest(extractedContext, "playwright", testUtils);
+
+        // Inject recording context for self-healing (use summarized version to keep files clean)
+        const summaryBrief = extractedContext.replace(/`/g, '\\`');
+        playwrightTest = `import { setRecordingContext } from '../src/self-heal.js';\n\nsetRecordingContext(\`${summaryBrief}\`);\n\n${playwrightTest}`;
+
         console.log("\n--- Playwright Test ---");
         console.log(playwrightTest);
 

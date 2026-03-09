@@ -145,6 +145,7 @@ export class ClaudeService {
         domContext: string,
         previouslyTried: string[] = [],
         expectedUrlHint?: string,
+        recordingContext?: string,
     ): Promise<string> {
         const alreadyTriedNote = previouslyTried.length > 1
             ? `\nDo NOT use any of these selectors — they have already been tried and failed:\n${previouslyTried.map(s => `  - ${s}`).join('\n')}\n`
@@ -154,8 +155,12 @@ export class ClaudeService {
             ? `\nNAVIGATION HINT: Clicking this element should cause the URL to change to match: ${expectedUrlHint}\nUse this to identify the correct button/link from the visible labels list — look for one whose text relates to this destination.\n`
             : '';
 
+        const recordingNote = recordingContext
+            ? `\nRECORDING GROUND TRUTH: The recording showed this successful context brief during creation:\n${recordingContext}\nUse this to confirm the user's intended action and find the matching element in the current DOM.\n`
+            : '';
+
         const prompt = `Playwright selector "${failedSelector}" (for: "${description}") no longer matches. Find a replacement in this DOM.
-${alreadyTriedNote}${urlHintNote}
+${alreadyTriedNote}${urlHintNote}${recordingNote}
 IMPORTANT: The description above is an imperative test instruction, NOT the element's visible label. For example, "Click submit button to apply filters" means the element is probably labelled "Apply Filters" or "Submit" — do NOT use the full description phrase as text= content.
 
 The DOM context below includes:

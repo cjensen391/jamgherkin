@@ -226,6 +226,15 @@ async function trySelector(
     }
 }
 
+let activeRecordingContext: string | undefined = undefined;
+
+/**
+ * Injects the Jam recording's technical brief to be used as ground truth for healing.
+ */
+export function setRecordingContext(brief: string) {
+    activeRecordingContext = brief;
+}
+
 export async function aiHealAction(
     page: Page,
     originalSelector: string,
@@ -340,6 +349,7 @@ export async function aiHealAction(
                 truncatedDom,
                 triedSelectors,
                 options?.expectedUrlHint,
+                activeRecordingContext,
             );
 
             console.log(`🤖 Claude proposed: '${newSelector}'`);
