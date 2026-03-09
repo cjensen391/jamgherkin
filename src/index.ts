@@ -36,10 +36,14 @@ interface ParsedArgs {
     outCypress: string;
     outFeatures: string;
     testUtils: Array<{ importPath: string; exports: string[] }>;
-    noRun: boolean;
-    listJams: boolean;
     mcpFetch: boolean;
     jamToken?: string;
+    noRun: boolean;
+    listJams: boolean;
+    statusCode?: string | undefined;
+    contentType?: string | undefined;
+    host?: string | undefined;
+    limit?: number | undefined;
 }
 
 function parseArgs(): ParsedArgs {
@@ -61,6 +65,10 @@ function parseArgs(): ParsedArgs {
             '  --test-utils     <spec>  Utility to inject, e.g. "../helpers:loginAs,setupTestDb"',
             '                           Repeat for multiple utility files.',
             '  --no-run                 Skip running the generated test',
+            '  --status-code <val>      Filter network by status code (e.g. 500, 5xx)',
+            '  --content-type <val>     Filter network by content type (e.g. application/json)',
+            '  --host <val>             Filter network by host (e.g. api.example.com)',
+            '  --limit <num>            Limit network requests (default: 20)',
         ].join('\n'));
         process.exit(1);
     }
@@ -97,6 +105,10 @@ function parseArgs(): ParsedArgs {
         noRun: argv.includes('--no-run'),
         listJams,
         mcpFetch,
+        statusCode: get('--status-code'),
+        contentType: get('--content-type'),
+        host: get('--host'),
+        limit: get('--limit') ? parseInt(get('--limit')!, 10) : undefined,
     };
 }
 
@@ -162,7 +174,12 @@ async function main() {
                         .replace(/[^a-z0-9]+/g, '-')
                         .replace(/(^-|-$)/g, '') || jamId;
 
-                    const mcpContext = await client.getJamContext(jam.id);
+                    const mcpContext = await client.getJamContext(jam.id, {
+                        statusCode: args.statusCode,
+                        contentType: args.contentType,
+                        host: args.host,
+                        limit: args.limit
+                    });
                     extractedContext = `Url: ${jamUrl}\n\nTechnical context from Jam API:\n${mcpContext}`;
                     console.log("✅ MCP Fetch complete.");
                 } else {

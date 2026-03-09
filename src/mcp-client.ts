@@ -108,7 +108,15 @@ export class JamMcpClient {
         return [];
     }
 
-    async getJamContext(jamIdOrUrl: string): Promise<string> {
+    async getJamContext(
+        jamIdOrUrl: string,
+        networkFilters: {
+            statusCode?: string | number | undefined;
+            contentType?: string | undefined;
+            host?: string | undefined;
+            limit?: number | undefined;
+        } = {}
+    ): Promise<string> {
         await this.ensureSession();
 
         const fetchTool = async (name: string, extraParams: object = {}) => {
@@ -170,7 +178,12 @@ export class JamMcpClient {
         const [events, logs, network] = await Promise.all([
             fetchTool("getUserEvents", { limit: 100 }), // Limit events too
             fetchTool("getConsoleLogs", { limit: 20 }),
-            fetchTool("getNetworkRequests", { limit: 20 })
+            fetchTool("getNetworkRequests", {
+                limit: networkFilters.limit || 20,
+                statusCode: networkFilters.statusCode,
+                contentType: networkFilters.contentType,
+                host: networkFilters.host
+            })
         ]);
 
         console.log(`   - Context sizes: Events=${events.length}, Logs=${logs.length}, Network=${network.length}`);
