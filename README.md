@@ -4,8 +4,11 @@ Transform your [Jam.dev](https://jam.dev/) screen recordings into fully automate
 
 JamGherkin acts as a bridge between your bug reports and your CI pipeline. Provide a Jam recording URL, and the system instantly analyzes the video's technical context (DOM interactions, network calls, console logs) to generate End-to-End (E2E) tests in **Playwright**, **Cypress**, and **Gherkin**.
 
+Powered by **Claude** (default) or **Gemini** — both providers are fully supported with identical capabilities.
+
 ## Features
 - 🤖 **Multi-Framework Output**: Automatically generates tests for Playwright (`.spec.ts`), Cypress (`.cy.ts`), and Gherkin (`.feature`).
+- 🧠 **Dual AI Providers**: Powered by **Claude** (default) or **Gemini** — both support Gherkin, self-healing wrappers, test-utils injection, auth env vars, and clean Gherkin prompts.
 - 🛠️ **AI Self-Healing (Playwright)**: Emits custom `aiClick` and `aiFill` wrappers instead of standard locators. If the DOM structure changes and breaks the test, the system:
   1. Tries **30+ heuristic selector candidates** (data-testid, role, aria-label, text, type patterns) with no AI cost.
   2. Falls back to **Claude** (up to 3 attempts) if heuristics fail, passing previously-tried selectors so it never repeats a guess.
@@ -13,6 +16,7 @@ JamGherkin acts as a bridge between your bug reports and your CI pipeline. Provi
 - 🔐 **Intelligent Security**: Automatically redacts passwords, JWTs, and API keys from scraped Jam data before it reaches Claude. Auth flows inject `TEST_EMAIL` and `TEST_PASSWORD` from your `.env`.
 - 📄 **Clean Gherkin**: Noise-filters console errors, CDN URLs, timestamps, and browser metadata before generation so Gherkin reads as business language, not a debug log.
 - 🔗 **Cross-Repo Integration**: Generate tests directly into another codebase via `--out-*` flags. Inject that repo's test utilities (login helpers, DB seeders) into generated code via `--test-utils`. Use `jamgherkin/self-heal` as an npm dependency for self-healing in any Playwright project.
+
 
 ## Setup
 ### 1. Install Dependencies

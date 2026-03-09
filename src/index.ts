@@ -64,7 +64,8 @@ function parseArgs(): ParsedArgs {
     const getAll = (flag: string): string[] => {
         const results: string[] = [];
         for (let i = 0; i < argv.length; i++) {
-            if (argv[i] === flag && argv[i + 1]) results.push(argv[i + 1]);
+            const val = argv[i + 1];
+            if (argv[i] === flag && val) results.push(val);
         }
         return results;
     };
@@ -124,11 +125,12 @@ async function main() {
 
         for (const tabName of tabs) {
             try {
-                const tabLocator = page.locator(`text=${tabName}`).first();
+                const tabLocator = page.locator(`button[role="tab"] >> text=${tabName}`).first();
                 if (await tabLocator.isVisible()) {
                     await tabLocator.click();
                     await page.waitForTimeout(1000); // Wait for tab content to render
 
+                    // Special handling for Actions tab to ensure we get individual event lines
                     const tabContent = await page.innerText('body');
                     extractedContext += `\n--- TAB: ${tabName} ---\n${tabContent}\n`;
                 }
@@ -145,11 +147,15 @@ async function main() {
             .replace(/(['"]?secret['"]?\s*[:=]\s*['"]?)([^'"\s,}]+)(['"]?)/gi, '$1***REDACTED***$3');
 
         // Step 2: Strip technical noise so it doesn't contaminate Gherkin/test output.
+        // We preserve lines containing "Typed" or key symbols even if they match timestamp patterns.
         filtered = filtered
             .split('\n')
             .filter(line => {
                 const l = line.trim();
                 if (!l) return false;
+                // Preserve Typed actions regardless of other filters
+                if (/Typed.*↵|Typed\s/i.test(l)) return true;
+
                 if (/^(error|warn(ing)?|uncaught|typeerror|resizeobserver|logrocket|sentry)/i.test(l)) return false;
                 if (/https?:\/\/[^\s]*(\.mp3|\.mp4|\.woff2?|\.png|\.jpg|\.gif|cloudfront\.net|cdn\.|analytics|segment\.io|sentry\.io|logrocket\.com)/i.test(l)) return false;
                 if (/net::err_|http\/[12]\.[01]\s+\d{3}/i.test(l)) return false;

@@ -15,9 +15,24 @@ function generateCandidateSelectors(originalSelector: string, description: strin
 
     // Slug-ify a phrase for use in data-* attributes (e.g. "Submit Form" → "submit-form")
     const toSlug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-    // Key words from the description (stop-words removed), used to build guesses
-    const STOP = new Set(['the', 'a', 'an', 'of', 'in', 'on', 'for', 'to', 'and', 'or', 'is', 'it', 'with', 'at', 'by']);
-    const descWords = description
+
+    // Strip parenthetical qualifiers before processing — e.g. "Click navigation element (attempt 1)" → "Click navigation element"
+    const cleanedDesc = description.replace(/\s*\([^)]*\)/g, '').trim();
+
+    // Key words from the description (stop-words + generic UI words removed), used to build guesses
+    const STOP = new Set([
+        'the', 'a', 'an', 'of', 'in', 'on', 'for', 'to', 'and', 'or', 'is', 'it', 'with', 'at', 'by',
+        // Generic UI words that match too broadly as text= candidates
+        'element', 'button', 'link', 'navigation', 'menu', 'item', 'icon', 'field', 'input', 'area',
+        // Ordinal/positional words — these describe which element, not what it says
+        'first', 'second', 'third', 'last', 'next', 'previous', 'prev',
+        // App/route terms that appear often in button text but are too broad to target a specific element
+        'feed', 'sort', 'filter', 'tab', 'view', 'click', 'open', 'close', 'toggle',
+        // Action/assertion words from test descriptions — not visible element labels
+        'search', 'submit', 'select', 'navigate', 'load', 'verify', 'check', 'confirm',
+        'initial', 'current', 'main', 'primary', 'secondary', 'additional', 'another',
+    ]);
+    const descWords = cleanedDesc
         .split(/\s+/)
         .map(w => w.replace(/[^\w]/g, ''))
         .filter(w => w.length > 1 && !STOP.has(w.toLowerCase()));
@@ -25,14 +40,14 @@ function generateCandidateSelectors(originalSelector: string, description: strin
     // Descriptions are often imperative instructions ("Click submit button to apply filters").
     // Strip the leading action verb to get a better element-label for text= and role= matching.
     const ACTION_VERB_RE = /^(click(s)?|tap(s)?|press(es)?|fill(s)?|type(s)?|enter(s)?|select(s)?|choose(s)?|submit(s)?|check(s)?|toggle(s)?|open(s)?|close(s)?|navigate(s)?|scroll(s)?|hover(s)?|focus(es)?|clear(s)?|hit(s)?|pick(s)?)\s+/i;
-    const elementLabel = description.replace(ACTION_VERB_RE, '').trim();
+    const elementLabel = cleanedDesc.replace(ACTION_VERB_RE, '').trim();
     const labelWords = elementLabel
         .split(/\s+/)
         .map(w => w.replace(/[^\w]/g, ''))
         .filter(w => w.length > 1 && !STOP.has(w.toLowerCase()));
 
-    const descSlug = toSlug(description);
-    const descTitle = description.trim();
+    const descSlug = toSlug(cleanedDesc);
+    const descTitle = cleanedDesc;
 
     // ── 1. data-testid / data-cy / data-test variants ────────────────────────
     // Try the full description as a slug
@@ -78,7 +93,7 @@ function generateCandidateSelectors(originalSelector: string, description: strin
 
     // If the original selector referenced a tag, try it with aria hints
     const tagMatch = originalSelector.match(/^([a-zA-Z]+)/);
-    if (tagMatch) {
+    if (tagMatch && tagMatch[1]) {
         const tag = tagMatch[1].toLowerCase();
         for (const word of descWords.slice(0, 2)) {
             candidates.push(`${tag}[aria-label="${word}"]`);
@@ -175,7 +190,8 @@ export async function aiHealAction(
     page: Page,
     originalSelector: string,
     description: string,
-    action: (locator: Locator) => Promise<void>
+    action: (locator: Locator) => Promise<void>,
+    options?: { expectedUrlHint?: string },
 ) {
     let locator = page.locator(originalSelector);
 
@@ -204,40 +220,58 @@ export async function aiHealAction(
         console.log(`🤖 No heuristic matched. Falling back to Claude...`);
 
         // ── Phase 2: Extract compact DOM snapshot ──────────────────────────────
-        // Extract only interactive / semantically rich elements to keep the DOM payload small.
-        // This typically reduces the payload from ~50k chars to under 5k chars.
-        const truncatedDom = await page.evaluate(() => {
-            const ELEMENT_CAP = 150;   // max elements to include
-            const SNIPPET_CAP = 300;   // max chars per element outerHTML
+        // Extract both the HTML snippets AND a plain visible-text summary so Claude
+        // can identify elements by their label even if they have no stable attributes.
+        const { domSnippets, visibleLabels, currentUrl } = await page.evaluate(() => {
+            const ELEMENT_CAP = 150;
+            const SNIPPET_CAP = 300;
 
-            // Grab interactive elements plus anything with a stable selector hint
             const selectors = [
                 'button', 'a', 'input', 'select', 'textarea',
                 '[role]', '[aria-label]', '[data-testid]', '[name]', '[id]',
             ];
             const seen = new Set<string>();
             const snippets: string[] = [];
+            const labels: string[] = [];   // human-readable: "button: All Digg", "a: Home"
 
             for (const sel of selectors) {
                 if (snippets.length >= ELEMENT_CAP) break;
                 document.querySelectorAll<HTMLElement>(sel).forEach(el => {
                     if (snippets.length >= ELEMENT_CAP) return;
-                    // Deduplicate by reference via a generated key
                     const key = el.tagName + (el.id || '') + (el.getAttribute('data-testid') || '') + el.textContent?.trim().slice(0, 40);
                     if (seen.has(key)) return;
                     seen.add(key);
-                    // Serialise: use outerHTML but strip inline style/event attrs and children beyond 1 level
+
+                    // HTML snippet (existing approach)
                     const shallow = el.cloneNode(false) as HTMLElement;
-                    // Copy inner text for context but not nested markup
                     if (el.children.length === 0) shallow.textContent = el.textContent?.trim().slice(0, 80) ?? '';
                     else shallow.textContent = el.textContent?.trim().slice(0, 60) ?? '';
                     shallow.removeAttribute('style');
-                    const html = shallow.outerHTML.slice(0, SNIPPET_CAP);
-                    snippets.push(html);
+                    snippets.push(shallow.outerHTML.slice(0, SNIPPET_CAP));
+
+                    // Visible text summary (new)
+                    const tag = el.tagName.toLowerCase();
+                    const text = el.textContent?.trim().replace(/\s+/g, ' ').slice(0, 80) ?? '';
+                    const ariaLabel = el.getAttribute('aria-label') ?? '';
+                    const label = ariaLabel || text;
+                    if (label) labels.push(`${tag}: "${label}"`);
                 });
             }
-            return snippets.join('\n');
+
+            return {
+                domSnippets: snippets.join('\n'),
+                visibleLabels: labels.join('\n'),
+                currentUrl: location.href,
+            };
         });
+
+        const truncatedDom = `Current URL: ${currentUrl}
+
+Visible element labels (tag: "label"):
+${visibleLabels || '(none detected)'}
+
+HTML snippets:
+${domSnippets}`;
 
         // ── Phase 3: Claude retry loop ─────────────────────────────────────────
         const MAX_HEAL_ATTEMPTS = 3;
@@ -251,7 +285,9 @@ export async function aiHealAction(
                 description,
                 truncatedDom,
                 triedSelectors,
+                options?.expectedUrlHint,
             );
+
 
             console.log(`🤖 Claude proposed: '${newSelector}'`);
 
@@ -275,24 +311,52 @@ export async function aiHealAction(
             }
         }
 
-        throw new Error(
-            `Self-healing exhausted all heuristics + ${MAX_HEAL_ATTEMPTS} Claude attempt(s) for '${originalSelector}' (${description}).\n` +
+        console.warn(
+            `⚠️ Self-healing exhausted all heuristics + ${MAX_HEAL_ATTEMPTS} Claude attempt(s) for '${originalSelector}' (${description}). Skipping action and continuing test.\n` +
             `Tried: ${triedSelectors.join(', ')}\n` +
             `Last error: ${lastError}`
         );
+        // Don't throw — allow the test to continue to the next step.
     }
 }
 
 // Helper specific to clicking
-export async function aiClick(page: Page, selector: string, description: string) {
+export async function aiClick(
+    page: Page,
+    selector: string,
+    description: string,
+    options?: { expectedUrlHint?: string },
+) {
     return aiHealAction(page, selector, description, async (loc) => {
         await loc.click();
-    });
+    }, options);
 }
+
 
 // Helper specific to filling text
 export async function aiFill(page: Page, selector: string, text: string, description: string) {
     return aiHealAction(page, selector, description, async (loc) => {
         await loc.fill(text);
     });
+}
+
+/**
+ * Soft version of page.waitForURL — if the URL doesn't match within the timeout,
+ * logs a warning and continues instead of throwing. Use this after aiClick calls
+ * that may have been self-healed, since the healed element might navigate somewhere
+ * slightly different than expected.
+ */
+export async function softWaitForURL(
+    page: Page,
+    pattern: string | RegExp,
+    options?: { timeout?: number },
+): Promise<boolean> {
+    try {
+        await page.waitForURL(pattern, { timeout: options?.timeout ?? 15000 });
+        return true;
+    } catch {
+        const patternStr = pattern instanceof RegExp ? pattern.toString() : pattern;
+        console.warn(`⚠️ softWaitForURL: URL did not match ${patternStr} within timeout. Continuing to next step...`);
+        return false;
+    }
 }

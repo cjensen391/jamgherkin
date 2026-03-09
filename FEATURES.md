@@ -89,6 +89,22 @@ Install via `npm link` for local dev or `"jamgherkin": "github:your-org/jamgherk
 
 *(Use Case: A team maintains `other-repo` with a shared `loginAs()` helper. Running `runQA` with `--test-utils "../helpers:loginAs"` means every generated test automatically calls `loginAs()` at the top instead of duplicating the login steps.)*
 
+### 8. Dual AI Provider Support
+Both **Claude** (`claude-service.ts`) and **Gemini** (`gemini-service.ts`) are fully supported with identical capabilities:
+
+| Feature | Claude | Gemini |
+|---|---|---|
+| Playwright test generation | ✅ | ✅ |
+| Cypress test generation | ✅ | ✅ |
+| Gherkin BDD generation | ✅ | ✅ |
+| `aiClick`/`aiFill` wrapper instructions | ✅ | ✅ |
+| Auth env var injection | ✅ | ✅ |
+| `--test-utils` helper injection | ✅ | ✅ |
+| `domcontentloaded` guidance | ✅ | ✅ |
+| Self-healing (Claude-powered) | ✅ | — |
+
+Switch providers by changing the service instantiated in `index.ts`. Requires the corresponding API key (`ANTHROPIC_API_KEY` or `GEMINI_API_KEY`) in `.env`.
+
 ---
 
 ## 📋 Planned / TODO
