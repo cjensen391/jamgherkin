@@ -32,9 +32,8 @@ Pass a Jam.dev recording URL and the system writes test suites across all three 
 ## 🛠 Self-Healing Phases & Caching
 UI locators break when structure or class names change. JamGherkin mitigates flaky tests by bringing an LLM into the test runtime — as a last resort, not a first call.
 
-**Healing runs in two phases:**
+**Healing runs in five phases:**
 
-**Healing runs in four phases:**
 
 **Phase 0 — Cache Hit:**
 Checks `test-results/heal-cache.json` for a previously successful fix for this selector. If found, it's tried immediately, skipping all AI calls and heuristics.
