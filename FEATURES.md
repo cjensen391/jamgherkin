@@ -14,7 +14,8 @@ Pass a Jam.dev recording URL and the system writes test suites across all three 
 
 ### 8. Jam MCP Integration (Model Context Protocol)
 - **Zero-Config Context**: No more scraping video pages. JamGherkin connects directly to the [Jam MCP Server](https://mcp.jam.dev/mcp) to fetch high-fidelity technical events.
-- **Automatic Domain Isolation**: By default, the tool extracts the target domain (e.g., `digg.com`) and silences common noisy hosts (like `jam.dev` analytics).
+- **Interactive CLI Menu**: `npm run runQA` with no arguments launches an interactive terminal prompt to fetch and select recent Jams.
+- **Accurate Domain Isolation**: First queries `getUserEvents` via MCP to find the true origin URL, correctly isolating the network to the recorded domain and silencing 3rd-party traffic.
 - **Surgical Network Filtering**: Use CLI flags like `--status-code 5xx` or `--content-type application/json` to prune the technical "firehose" before it reaches the AI.
 - **Search & List**: Use `--list-jams` or search by title to find recordings without leaving the terminal.
 - **Auto-enable**: System automatically detects Jam URLs and enables context fetching if `JAM_TOKEN` is found.
@@ -22,6 +23,7 @@ Pass a Jam.dev recording URL and the system writes test suites across all three 
 ### 9. Navigation & Assertion Healing (aiWaitForURL)
 - **Active Navigation Auditing**: Traditional `waitForURL` simply timeouts if a match isn't found. `aiWaitForURL` triggers a **Situation Audit** upon failure.
 - **Claude "Truth" Comparison**: Claude compares the current live URL and DOM against the original recording's technical brief.
+- **Robust Parsing**: Built-in markdown stripping prevents JSON parse errors during audits.
 - **Intelligent Recovery**:
   - **Minor Variation**: If the URL only differs by a non-critical slug or parameter, Claude marking the step as "Success" allows the test to proceed.
   - **Missed Step**: If a navigation step was missed (e.g. a click didn't fire), Claude identifies the missing action and the system can backtrack to recover.
@@ -142,6 +144,7 @@ Switch providers by changing the service instantiated in `index.ts`. Requires th
 - [x] `--no-run` flag to skip running the generated test
 - [x] `--out-playwright` / `--out-cypress` / `--out-features` flags for custom output dirs
 - [x] `--test-utils` flag to inject helper imports into generated code
+- [x] Interactive CLI Menu to list and select videos
 - [ ] `--gherkin-only` flag to skip Playwright/Cypress generation
 - [ ] Batch mode: accept multiple Jam URLs in one run
 - [ ] Optional step to scan existing test files and de-duplicate against newly generated ones

@@ -10,7 +10,8 @@ Powered by **Claude** (default) or **Gemini** — both providers are fully suppo
 - 🤖 **Multi-Framework Output**: Automatically generates tests for Playwright (`.spec.ts`), Cypress (`.cy.ts`), and Gherkin (`.feature`).
 - 🧠 **Dual AI Providers**: Powered by **Claude** (default) or **Gemini** — both support Gherkin, self-healing wrappers, test-utils injection, auth env vars, and clean Gherkin prompts.
 - 📁 **Zero-Config Context (Jam MCP)**: Leverages the [Model Context Protocol](https://modelcontextprotocol.io/) to fetch full technical context (network, logs, events) directly from the Jam API.
-- 🎯 **Automatic Domain Isolation**: Automatically detects the domain under test and filters out noisy 3rd-party traffic (`jam.dev`, analytics, etc.) by default.
+- 🎮 **Interactive CLI Menu**: Run `npm run runQA` with no arguments to launch an interactive terminal prompt to fetch and select recent Jams.
+- 🎯 **Accurate Domain Isolation**: Automatically detects the domain under test by fetching `getUserEvents` via MCP, filtering out noisy 3rd-party traffic (`jam.dev`, analytics, etc.) by default.
 - 🌡️ **Advanced Network Filtering**: Surgical control over context via CLI flags: `--status-code`, `--content-type`, `--host`, and `--limit`.
 - 🛠️ **AI Self-Healing (Playwright)**: Emits custom `aiClick`, `aiFill`, `aiPress`, `aiWaitFor`, and `aiWaitForURL` wrappers. If a step fails, the system:
   1. **Ground Truth Healing**: Uses the original Jam technical brief as a reference for perfect selector recovery.
@@ -60,7 +61,9 @@ npm run runQA -- <jam-url>
 
 ### All options
 ```
-npm run runQA -- <jam-url> [options]
+npm run runQA -- [jam-url] [options]
+
+If no URL is provided, an interactive menu will appear.
 
   - `--list-jams`: List 10 most recent Jam recordings.
   - `--status-code <pattern>`: Filter network traffic (e.g., `5xx`, `404`).
@@ -129,6 +132,7 @@ When running Playwright tests, if a selector breaks:
 - [x] Implement `aiWaitFor` for self-healing element waits
 - [x] Implement `aiWaitForURL` for self-healing navigation audits
 - [x] Add transient retry loop for initial actions (handles loading/animations)
+- [x] Interactive CLI Menu to list and select videos
 - [ ] Cypress self-healing wrappers (`cyClick`, `cyFill`) analogous to the Playwright ones
 - [ ] GitHub Actions workflow example for running generated tests in CI
 - [ ] Web UI / dashboard to view generated tests and healing history

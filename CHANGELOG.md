@@ -8,13 +8,15 @@ All notable changes to this project are documented here.
 
 #### Jam MCP Integration (Model Context Protocol) 📁
 - Replaced custom scraping with a direct connection to the [Jam MCP Server](https://mcp.jam.dev/mcp).
+- **Interactive CLI Menu**: `npm run runQA` with no arguments now launches an interactive terminal prompt to fetch and select recent Jams.
 - **Zero-Config Context**: High-fidelity events (network, logs, user actions) now fetched via structured API instead of DOM scraping.
-- **Automatic Domain Isolation**: Added logic to detect the target domain from Jam metadata and filter out noisy `jam.dev` and 3rd-party traffic by default.
+- **Accurate Domain Isolation**: Added logic to explicitly fetch `getUserEvents` via MCP to find the true origin URL, correctly isolating the network to the recorded domain.
 - **Advanced Network Filtering**: New CLI flags (`--status-code`, `--content-type`, `--host`, `--limit`) for surgical context pruning.
 - Added `--list-jams` to browse recent team recordings from the terminal.
 
 #### Universal Healing & Ground Truth 🛠️
 - **aiWaitForURL & Situation Audit**: Replaced passive waiting with an active audit. If a URL doesn't match, Claude analyzes the live DOM vs. the recording to decide whether to continue, retry a missed step, or fail.
+  - *Fix*: Added automatic markdown stripping during Situation Audits to prevent `Unexpected token` JSON parse errors when Claude wraps responses in code blocks.
 - **Error-Aware Healing**: Playwright error messages (e.g., "Element is not an input") are now passed to Claude during healing to prevent repetitive invalid suggestions.
 - **aiWaitFor**: Introduced self-healing wait steps for elements to prevent test crashes on simple timeouts.
 - **Optional Actions**: Added an `optional` flag to `aiClick`, `aiFill`, etc., allowing tests to bypass non-essential UI (like cookie banners) gracefully.
