@@ -1,43 +1,229 @@
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
-import { EventSource } from "eventsource";
 import dotenv from "dotenv";
-
 dotenv.config();
 
+export interface JamMetadata {
+    id: string;
+    title: string;
+    url: string;
+    author: string;
+    createdAt: string;
+}
+
 export class JamMcpClient {
-    private client: Client;
-    private transport: SSEClientTransport;
+    private token: string;
+    private url: string = "https://mcp.jam.dev/mcp";
+    private sessionId: string | null = null;
 
     constructor() {
-        const url = new URL("https://mcp.jam.dev/mcp");
-        this.transport = new SSEClientTransport(url, {
-            eventSourceInit: {
-                headers: {
-                    "Authorization": `Bearer ${process.env.JAM_TOKEN}`
-                }
-            } as any
+        this.token = process.env.JAM_TOKEN || "";
+    }
+
+    private async ensureSession() {
+        if (this.sessionId) return;
+
+        const res = await fetch(this.url, {
+            method: "POST",
+            headers: {
+                "Authorization": `Bearer ${this.token}`,
+                "Content-Type": "application/json",
+                "Accept": "application/json, text/event-stream"
+            },
+            body: JSON.stringify({
+                jsonrpc: "2.0",
+                method: "initialize",
+                params: {
+                    protocolVersion: "2024-11-05",
+                    capabilities: {},
+                    clientInfo: { name: "jamgherkin", version: "1.0.0" }
+                },
+                id: 1
+            })
         });
-        this.client = new Client(
-            { name: "jam-test-gen", version: "1.0.0" },
-            { capabilities: {} }
-        );
+
+        if (!res.ok) {
+            throw new Error(`Failed to initialize Jam MCP session: ${res.status} ${res.statusText}`);
+        }
+
+        this.sessionId = res.headers.get("mcp-session-id");
+        if (!this.sessionId) {
+            throw new Error("No mcp-session-id returned from Jam MCP server");
+        }
+
+        // Send initialized notification
+        await fetch(this.url, {
+            method: "POST",
+            headers: {
+                "Authorization": `Bearer ${this.token}`,
+                "Content-Type": "application/json",
+                "Accept": "application/json, text/event-stream",
+                "mcp-session-id": this.sessionId || ""
+            },
+            body: JSON.stringify({
+                jsonrpc: "2.0",
+                method: "notifications/initialized"
+            })
+        });
     }
 
-    async connect() {
-        await this.client.connect(this.transport);
-        console.log("Connected to Jam MCP");
+    async listJams(limit: number = 10): Promise<JamMetadata[]> {
+        await this.ensureSession();
+
+        const res = await fetch(this.url, {
+            method: "POST",
+            headers: {
+                "Authorization": `Bearer ${this.token}`,
+                "Content-Type": "application/json",
+                "Accept": "application/json, text/event-stream",
+                "mcp-session-id": this.sessionId!
+            },
+            body: JSON.stringify({
+                jsonrpc: "2.0",
+                method: "tools/call",
+                params: {
+                    name: "listJams",
+                    arguments: { limit }
+                },
+                id: Date.now()
+            })
+        });
+
+        const text = await res.text();
+        const lines = text.split("\n");
+        for (const line of lines) {
+            if (line.startsWith("data: ")) {
+                const json = JSON.parse(line.slice(6));
+                if (json.result?.content?.[0]?.text) {
+                    try {
+                        // The tool returns text, which might be JSON or a list.
+                        // Based on the 'listJams' description, it returns Jam metadata.
+                        const toolsResult = JSON.parse(json.result.content[0].text);
+                        return toolsResult;
+                    } catch (e) {
+                        // Fallback if it's not JSON
+                        console.error("Could not parse listJams content as JSON:", json.result.content[0].text);
+                    }
+                }
+            }
+        }
+        return [];
     }
 
-    async listTools() {
-        return await this.client.listTools();
+    async getJamContext(jamIdOrUrl: string): Promise<string> {
+        await this.ensureSession();
+
+        const fetchTool = async (name: string, extraParams: object = {}) => {
+            console.log(`   - Calling tool: ${name}...`);
+            const res = await fetch(this.url, {
+                method: "POST",
+                headers: {
+                    "Authorization": `Bearer ${this.token}`,
+                    "Content-Type": "application/json",
+                    "Accept": "application/json, text/event-stream",
+                    "mcp-session-id": this.sessionId || ""
+                },
+                body: JSON.stringify({
+                    jsonrpc: "2.0",
+                    method: "tools/call",
+                    params: {
+                        name,
+                        arguments: { jamId: jamIdOrUrl, ...extraParams }
+                    },
+                    id: `${Date.now()}-${name}`
+                })
+            });
+
+            if (!res.body) return "";
+            const reader = res.body.getReader();
+            const decoder = new TextDecoder();
+            let resultText = "";
+            let buffer = "";
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split("\n");
+                buffer = lines.pop() || "";
+
+                for (const line of lines) {
+                    if (line.startsWith("data: ")) {
+                        try {
+                            const json = JSON.parse(line.slice(6));
+                            if (json.result?.content?.[0]?.text) {
+                                let text = json.result.content[0].text;
+                                if (text.length > 20000) {
+                                    text = text.substring(0, 20000) + "... (truncated)";
+                                }
+                                resultText = text;
+                            }
+                        } catch (e) { }
+                    }
+                }
+                // If we got a result, we can probably stop reading for this specific tool call
+                if (resultText) break;
+            }
+            reader.cancel().catch(() => { });
+            return resultText;
+        };
+
+        const [events, logs, network] = await Promise.all([
+            fetchTool("getUserEvents", { limit: 100 }), // Limit events too
+            fetchTool("getConsoleLogs", { limit: 20 }),
+            fetchTool("getNetworkRequests", { limit: 20 })
+        ]);
+
+        console.log(`   - Context sizes: Events=${events.length}, Logs=${logs.length}, Network=${network.length}`);
+
+        let context = `--- USER EVENTS ---\n${events}\n\n`;
+        context += `--- CONSOLE LOGS ---\n${logs}\n\n`;
+        context += `--- NETWORK REQUESTS ---\n${network}\n`;
+
+        if (!events && !logs && !network) {
+            throw new Error("Failed to retrieve any Jam context via MCP tools");
+        }
+
+        return context;
     }
 
-    async callTool(name: string, args: any) {
-        return await this.client.callTool({ name, arguments: args });
-    }
+    async searchJams(query: string): Promise<JamMetadata[]> {
+        await this.ensureSession();
 
-    async disconnect() {
-        await this.transport.close();
+        const res = await fetch(this.url, {
+            method: "POST",
+            headers: {
+                "Authorization": `Bearer ${this.token}`,
+                "Content-Type": "application/json",
+                "Accept": "application/json, text/event-stream",
+                "mcp-session-id": this.sessionId!
+            },
+            body: JSON.stringify({
+                jsonrpc: "2.0",
+                method: "tools/call",
+                params: {
+                    name: "search",
+                    arguments: { query }
+                },
+                id: Date.now()
+            })
+        });
+
+        const text = await res.text();
+        const lines = text.split("\n");
+        for (const line of lines) {
+            if (line.startsWith("data: ")) {
+                const json = JSON.parse(line.slice(6));
+                if (json.result?.content?.[0]?.text) {
+                    try {
+                        const searchResult = JSON.parse(json.result.content[0].text);
+                        // The search tool returns an object with a 'results' array
+                        return searchResult.results || searchResult.jams || (Array.isArray(searchResult) ? searchResult : []);
+                    } catch (e) {
+                        console.error("Could not parse search result as JSON:", json.result.content[0].text);
+                    }
+                }
+            }
+        }
+        return [];
     }
 }

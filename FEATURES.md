@@ -12,7 +12,14 @@ Pass a Jam.dev recording URL and the system writes test suites across all three 
 
 *(Use Case: A QA engineer or PM records a bug in Jam. The system instantly generates automated regressions for Playwright and Cypress, closing the gap between manual reporting and automation.)*
 
-### 2. AI-Powered Self-Healing Tests (Playwright)
+### 8. Jam MCP Integration
+- **Automatic Discovery**: Use `--list-jams` to fetch your 10 most recent recordings directly from the Jam API via the Model Context Protocol.
+- **Handshake Recovery**: Implements a custom handshake to handle Jam's session-based SSE protocol.
+- **Metadata Access**: Leverages `listJams` and `getJam` tools for deep context extraction.
+
+---
+
+## 🛠 Self-Healing Phases & Caching
 UI locators break when structure or class names change. JamGherkin mitigates flaky tests by bringing an LLM into the test runtime — as a last resort, not a first call.
 
 **Healing runs in two phases:**

@@ -14,7 +14,7 @@ export class ClaudeService {
     constructor() {
         const apiKey = process.env.ANTHROPIC_API_KEY || "";
         this.anthropic = new Anthropic({ apiKey });
-        this.model = "claude-haiku-4-5-20251001"; // Anthropic's lowest cost model available in 2026 for this key
+        this.model = "claude-haiku-4-5-20251001"; // Anthropic's lowest cost model available in 2026
     }
 
     async generateTest(
@@ -197,6 +197,42 @@ Reply with ONLY the raw selector string, no quotes, no explanation.`;
         } catch (e) {
             console.error("Failed to heal selector with Claude", e);
             throw e;
+        }
+    }
+
+    async summarizeContext(rawContext: string): Promise<string> {
+        const prompt = `
+      You are a technical analyst. I will provide you with raw technical logs (events, console, network) from a Jam.dev recording.
+      Your goal is to summarize this data into a concise technical brief for a test engineer.
+      
+      RULES:
+      - Focus ONLY on actions that changed the UI state (clicks, typing, navigation).
+      - Include ONLY critical network failures (4xx, 5xx) or important API responses.
+      - Include ONLY error/warning console logs that are not background noise.
+      - Keep the summary under 1000 tokens.
+      - Maintain the "Typed [value] [key]" patterns as they are crucial for testing.
+
+      Raw Context:
+      ${rawContext}
+
+      Output ONLY the summarized technical brief.
+    `;
+
+        try {
+            const response = await this.anthropic.messages.create({
+                model: this.model,
+                max_tokens: 1500,
+                messages: [{ role: "user", content: prompt }]
+            });
+
+            const block = response.content.find(block => block.type === 'text');
+            if (block && block.type === 'text') {
+                return block.text.trim();
+            }
+            return rawContext;
+        } catch (e) {
+            console.error("Failed to summarize context with Claude", e);
+            return rawContext;
         }
     }
 }

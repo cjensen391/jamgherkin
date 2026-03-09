@@ -15,7 +15,7 @@ async function getContext() {
             headers: {
                 "Authorization": `Bearer ${token}`,
                 "Content-Type": "application/json",
-                "Accept": "application/json"
+                "Accept": "application/json, text/event-stream"
             },
             body: JSON.stringify({
                 jsonrpc: "2.0",

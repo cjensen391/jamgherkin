@@ -37,7 +37,14 @@ Fill out `.env` with your API keys:
 
 ## Usage
 
-### Basic
+### 1. (Optional) List recent Jams
+Use the MCP integration to see your recent recordings:
+```bash
+npm run runQA -- --list-jams
+```
+
+### 2. Generate tests from a Jam video
+Copy a Jam URL and run the following:
 ```bash
 npm run runQA -- <jam-url>
 ```
@@ -46,7 +53,8 @@ npm run runQA -- <jam-url>
 ```
 npm run runQA -- <jam-url> [options]
 
-  --out-playwright <dir>   Playwright output dir   (default: ./tests)
+ - `--list-jams`: List 10 most recent Jam recordings from your team using the MCP server.
+- `--out-playwright <dir>`: Custom directory for Playwright tests (default: `./tests`)
   --out-cypress    <dir>   Cypress output dir      (default: ./cypress/e2e)
   --out-features   <dir>   Gherkin output dir      (default: ./features)
   --test-utils     <spec>  Inject a helper module from the target codebase.
