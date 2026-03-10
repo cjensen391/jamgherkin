@@ -192,8 +192,9 @@ export class JamMcpClient {
     ): Promise<string> {
         await this.ensureSession();
 
+        // Fetch structured data in parallel
         const [events, logs, network] = await Promise.all([
-            this.fetchTool("getUserEvents", jamIdOrUrl, { limit: 100 }), // Limit events too
+            this.fetchTool("getUserEvents", jamIdOrUrl, { limit: 100 }),
             this.fetchTool("getConsoleLogs", jamIdOrUrl, { limit: 20 }),
             this.fetchTool("getNetworkRequests", jamIdOrUrl, {
                 limit: networkFilters.limit || 20,
@@ -203,11 +204,24 @@ export class JamMcpClient {
             })
         ]);
 
-        console.log(`   - Context sizes: Events=${events.length}, Logs=${logs.length}, Network=${network.length}`);
+        // Fetch visual analysis in parallel (best-effort — may not be available for all Jams)
+        const [videoAnalysis, transcript] = await Promise.all([
+            this.fetchTool("analyzeVideo", jamIdOrUrl).catch(() => ""),
+            this.fetchTool("getVideoTranscript", jamIdOrUrl).catch(() => ""),
+        ]);
+
+        console.log(`   - Context sizes: Events=${events.length}, Logs=${logs.length}, Network=${network.length}${videoAnalysis ? `, VideoAnalysis=${videoAnalysis.length}` : ''}${transcript ? `, Transcript=${transcript.length}` : ''}`);
 
         let context = `--- USER EVENTS ---\n${events}\n\n`;
         context += `--- CONSOLE LOGS ---\n${logs}\n\n`;
         context += `--- NETWORK REQUESTS ---\n${network}\n`;
+
+        if (videoAnalysis) {
+            context += `\n--- VIDEO ANALYSIS (visual observations from recording) ---\n${videoAnalysis}\n`;
+        }
+        if (transcript) {
+            context += `\n--- VIDEO TRANSCRIPT (user speech) ---\n${transcript}\n`;
+        }
 
         if (!events && !logs && !network) {
             throw new Error("Failed to retrieve any Jam context via MCP tools");

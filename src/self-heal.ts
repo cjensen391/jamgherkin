@@ -11,6 +11,93 @@ const ACTION_RETRY_DELAY = 1000;
 const CACHE_PATH = path.join('test-results', 'heal-cache.json');
 
 /**
+ * Validates a selector against the quality hierarchy.
+ * Returns a score (0-100) where higher is better, and a list of issues.
+ */
+function validateSelector(selector: string): { score: number; issues: string[]; tier: number } {
+    const issues: string[] = [];
+    let score = 50; // Base score
+    let tier = 6; // Default to lowest tier
+
+    // Tier 1: data-testid, data-cy, data-test (best)
+    if (/\[data-(testid|cy|test)=/.test(selector)) {
+        score = 100;
+        tier = 1;
+    }
+    // Tier 2: role with name
+    else if (/^role=/.test(selector) && /\[name=/.test(selector)) {
+        score = 95;
+        tier = 2;
+    }
+    // Tier 3: aria-label
+    else if (/\[aria-label=/.test(selector)) {
+        score = 85;
+        tier = 3;
+    }
+    // Tier 4: text selectors with tag
+    else if (/(button|a|input):has-text\(|^text=/.test(selector)) {
+        score = 75;
+        tier = 4;
+    }
+    // Tier 5: input type/placeholder
+    else if (/input\[type=|input\[placeholder=/.test(selector)) {
+        score = 70;
+        tier = 5;
+    }
+    // Tier 6: structural selectors
+    else if (/>/.test(selector)) {
+        score = 60;
+        tier = 6;
+    }
+
+    // Penalties for bad practices
+
+    // CRITICAL: CSS classes (most fragile)
+    const classMatches = selector.match(/\.([\w-]+)/g) || [];
+    if (classMatches.length > 0) {
+        const isTailwind = classMatches.some(c =>
+            /\.(bg-|text-|border-|flex-|grid-|p-|m-|w-|h-|rounded-|gap-|ring-|focus-|hover-|group|relative|absolute|fixed|cursor-|whitespace-|inline-|block|hidden|visible|z-|opacity-|shadow-)/.test(c)
+        );
+        if (isTailwind) {
+            issues.push(`Contains Tailwind/utility classes: ${classMatches.join(' ')}`);
+            score -= 50;
+        } else if (classMatches.length > 2) {
+            issues.push(`Too many CSS classes (${classMatches.length})`);
+            score -= 30;
+        } else {
+            issues.push(`Contains CSS class: ${classMatches.join(' ')}`);
+            score -= 20;
+        }
+    }
+
+    // Check for class attributes
+    if (/\[class[*~^$|]?=/.test(selector)) {
+        issues.push('Uses class attribute selector');
+        score -= 25;
+    }
+
+    // Bare tag selectors (too broad)
+    if (/^(div|span|button|a|input|i|svg)$/.test(selector)) {
+        issues.push(`Bare tag selector: "${selector}" (too broad)`);
+        score -= 40;
+    }
+
+    // Truncated selectors (incomplete)
+    if (/-te"|data-testid\*=/.test(selector)) {
+        issues.push('Appears to be truncated mid-word');
+        score -= 30;
+    }
+
+    // Empty or very short
+    if (selector.length < 3) {
+        issues.push('Selector too short or empty');
+        score = 0;
+    }
+
+    return { score: Math.max(0, Math.min(100, score)), issues, tier };
+}
+
+/**
  * Loads the persistent selector cache from disk.
  */
 function loadCache(): Record<string, string> {
@@ -28,7 +115,27 @@ function loadCache(): Record<string, string> {
 /**
  * Saves a healed selector to the persistent cache.
  */
+/**
+ * Returns true if a selector contains volatile auto-generated IDs that will change between renders.
+ * Examples: React's _r_0_, _r_b9_, Angular's ng-*, framework-generated hashes.
+ */
+function isVolatileSelector(selector: string): boolean {
+    return (
+        // React auto-generated IDs: _r_0_, _r_4k_, _r_b9_, etc.
+        /_r_[a-z0-9]+_/.test(selector) ||
+        // Hash-like IDs (long hex or alphanumeric) — likely generated, not authored
+        /#[a-f0-9]{8,}/.test(selector) ||
+        // Numeric-only IDs — almost always generated
+        /\[id=["']?\d+["']?\]/.test(selector) ||
+        /#\d+/.test(selector)
+    );
+}
+
 function saveToCache(originalSelector: string, healedSelector: string) {
+    if (isVolatileSelector(healedSelector)) {
+        console.warn(`⚠️ [Cache] Skipping cache for volatile selector '${healedSelector}' — it contains an auto-generated ID that will change between renders.`);
+        return;
+    }
     try {
         const cache = loadCache();
         cache[originalSelector] = healedSelector;
@@ -46,6 +153,10 @@ function saveToCache(originalSelector: string, healedSelector: string) {
  * Attempts to automatically update the test source file with the new selector.
  */
 function updateTestSourceFile(originalSelector: string, healedSelector: string) {
+    if (isVolatileSelector(healedSelector)) {
+        console.warn(`⚠️ [Source Update] Skipping source update for volatile selector '${healedSelector}' — writing an auto-generated ID to the test file will break on next render.`);
+        return;
+    }
     try {
         const stack = new Error().stack;
         if (!stack) return;
@@ -149,11 +260,23 @@ function generateCandidateSelectors(originalSelector: string, description: strin
         // Action/assertion words from test descriptions — not visible element labels
         'search', 'submit', 'select', 'navigate', 'load', 'verify', 'check', 'confirm',
         'initial', 'current', 'main', 'primary', 'secondary', 'additional', 'another',
+        // Wait/observe verbs — these describe test intent, not element labels
+        'wait', 'waiting', 'type', 'typing', 'press', 'pressing', 'fill', 'filling',
+        'become', 'visible', 'appear', 'appears', 'loaded', 'show', 'shows', 'reveal',
+        'if', 'when', 'then', 'that', 'which', 'where', 'how', 'any',
     ]);
+    // If the original selector already uses :has-text("Value"), treat those words as DATA VALUES
+    // (e.g. unit names, tenant names, property IDs) — do NOT re-use them as word-level text= candidates
+    // because they match specific content, not element structure.
+    const hasTextMatch = originalSelector.match(/:has-text\(["']([^"']+)["']\)/);
+    const dataValueWords = hasTextMatch
+        ? new Set(hasTextMatch[1]!.toLowerCase().split(/\s+/).filter(w => w.length > 1))
+        : new Set<string>();
+
     const descWords = cleanedDesc
         .split(/\s+/)
         .map(w => w.replace(/[^\w]/g, ''))
-        .filter(w => w.length > 1 && !STOP.has(w.toLowerCase()));
+        .filter(w => w.length > 1 && !STOP.has(w.toLowerCase()) && !dataValueWords.has(w.toLowerCase()));
 
     // Descriptions are often imperative instructions ("Click submit button to apply filters").
     // Strip the leading action verb to get a better element-label for text= and role= matching.
@@ -162,7 +285,7 @@ function generateCandidateSelectors(originalSelector: string, description: strin
     const labelWords = elementLabel
         .split(/\s+/)
         .map(w => w.replace(/[^\w]/g, ''))
-        .filter(w => w.length > 1 && !STOP.has(w.toLowerCase()));
+        .filter(w => w.length > 1 && !STOP.has(w.toLowerCase()) && !dataValueWords.has(w.toLowerCase()));
 
     const descSlug = toSlug(cleanedDesc);
     const descTitle = cleanedDesc;
@@ -426,6 +549,8 @@ export async function aiHealAction(
     }
 
     // ── Phase 4: Claude retry loop ─────────────────────────────────────────
+    let bestSelectorSoFar: { selector: string; score: number; tier: number } | null = null;
+
     for (let attempt = 1; attempt <= MAX_HEAL_ATTEMPTS; attempt++) {
         console.log(`🔍 Claude attempt ${attempt}/${MAX_HEAL_ATTEMPTS} (DOM length: ${domContext.length})`);
         try {
@@ -440,22 +565,40 @@ export async function aiHealAction(
 
             console.log(`🤖 Claude proposed: '${proposedSelector}'`);
 
+            // Validate selector quality before trying
+            const validation = validateSelector(proposedSelector);
+            if (validation.score < 40) {
+                console.warn(`⚠️  Proposed selector has low quality score (${validation.score}/100, tier ${validation.tier}). Issues: ${validation.issues.join(', ')}`);
+                if (validation.issues.some(i => i.includes('Tailwind') || i.includes('truncated'))) {
+                    console.warn(`   Rejecting selector due to critical issues. Retrying...`);
+                    triedWithErrors.push({ selector: proposedSelector, error: `Quality check failed: ${validation.issues[0]}` });
+                    continue;
+                }
+            } else {
+                console.log(`   ✓ Selector quality: ${validation.score}/100 (tier ${validation.tier})`);
+            }
+
             if (triedWithErrors.some(t => t.selector === proposedSelector)) {
                 console.warn(`⚠️  Claude returned a selector already tried ('${proposedSelector}'). Skipping.`);
                 triedWithErrors.push({ selector: proposedSelector, error: 'Already tried' });
                 continue;
             }
 
+            // Track best selector even if it doesn't work (for fallback strategy)
+            if (!bestSelectorSoFar || validation.score > bestSelectorSoFar.score) {
+                bestSelectorSoFar = { selector: proposedSelector, score: validation.score, tier: validation.tier };
+            }
+
             const matched = await trySelector(page, proposedSelector, action, 5000);
             if (matched) {
-                console.log(`✅ Healed on Claude attempt ${attempt}. Selector: '${proposedSelector}'`);
+                console.log(`✅ Healed on Claude attempt ${attempt}. Selector: '${proposedSelector}' (quality: ${validation.score}/100, tier ${validation.tier})`);
                 console.warn(`💡 TIP: Update your test suite to use '${proposedSelector}' instead of '${selectorStr}'`);
                 saveToCache(selectorStr, proposedSelector);
                 updateTestSourceFile(selectorStr, proposedSelector);
                 return;
             } else {
-                triedWithErrors.push({ selector: proposedSelector, error: 'Timeout or interaction failure' });
-                console.log(`❌ Claude attempt ${attempt} failed. Retrying...`);
+                triedWithErrors.push({ selector: proposedSelector, error: `No match (quality: ${validation.score}/100)` });
+                console.log(`❌ Claude attempt ${attempt} failed to find element. Retrying...`);
             }
         } catch (err: any) {
             lastError = err;

@@ -40,15 +40,16 @@ export class ClaudeService {
       - DO NOT use technical selectors in step descriptions.
       - Write in plain business language using "I" as the actor.
       - Focus on user goals.
+      - **OUTPUT FORMAT IS MANDATORY**: Your ENTIRE response must be valid Gherkin syntax starting with "Feature:". No markdown, no bullet points, no explanations. Even if context is missing or errored, output a placeholder Feature block with a comment — NEVER write prose.
 
       Jam Context:
       ${context}
 
       Instructions:
-      1. Identify the core user flow or bug.
-      2. Write a complete Gherkin Feature.
-      3. Write one or more Scenarios using Given/When/Then.
-      4. Output ONLY the raw text for the .feature file.
+      1. If context contains errors, 404s, or "Not Found" — still output a valid placeholder .feature file with a comment like "# Recording data unavailable" inside the Feature description.
+      2. Otherwise, identify the core user flow or bug.
+      3. Write a complete Gherkin Feature with one or more Scenarios using Given/When/Then.
+      4. Output ONLY the raw .feature file text. No markdown fences. No intro. No explanations. Start with "Feature:".
     ` : `
       You are an expert QA engineer.
       I will provide you with the technical context extracted from a Jam.dev video recording (console logs, network requests, DOM events).
@@ -74,7 +75,7 @@ export class ClaudeService {
          1. \`[data-testid="..."]\`, \`[data-cy="..."]\`, \`[data-test="..."]\`
          2. \`role="button"[name="Visible Text"]\`, \`role="link"[name="..."]\`, \`role="textbox"[name="..."]\`
          3. \`[aria-label="Action Description"]\`
-         4. \`button:has-text("Exact Text")\`, \`a:has-text("Exact Text")\`
+         4. \`button:has-text("Exact Text")\`, \`a:has-text("Exact Text")\` — **only for stable UI labels** (e.g. "Save", "Cancel", "All Digg"). **NEVER use dynamic data values** (unit names, tenant names, property addresses, IDs, user-generated content) as has-text selectors — use data-testid or role instead.
          5. \`input[type="search"]\`, \`input[placeholder="Search stories..."]\`
          6. \`form > button[type="submit"]\` (structural only, NO CLASSES)
       4. **DEBUGGABILITY & RELIABILITY RULES:**
@@ -100,10 +101,11 @@ export class ClaudeService {
       ${framework === 'playwright' ? `7. **MANDATORY SELF-HEALING:** You MUST use:
          import { aiClick, aiFill, aiPress, aiWaitFor, aiWaitForURL } from '../src/self-heal.js';
          - **CRITICAL**: EVERY interaction after \`page.goto\` MUST use \`aiClick\`, \`aiFill\`, \`aiPress\`, \`aiWaitFor\`, or \`aiWaitForURL\`. 
-         - **STRICTLY FORBIDDEN**: NEVER use \`page.click()\`, \`page.fill()\`, \`locator.click()\`, \`locator.fill()\`, \`locator.press()\`, \`page.waitForSelector()\`, or \`page.waitForURL()\`. These bypass healing!
-         - **SELECTOR RULE**: ALWAYS pass a **string literal selector** directly to the \`ai*\` functions. NEVER pass a \`page.locator()\` object or a variable containing a locator.
+         - **STRICTLY FORBIDDEN**: NEVER use \`page.click()\`, \`page.fill()\`, \`locator.click()\`, \`locator.fill()\`, \`locator.press()\`, \`locator.tripleClick()\`, \`locator.nth()\`, \`locator.first()\`, \`locator.last()\`, \`page.waitForSelector()\`, \`page.waitForURL()\`, \`locator.isVisible()\`, or \`locator.count()\`. These bypass healing and create fragile checks!
+         - **SELECTOR RULE**: ALWAYS pass a **string literal selector** directly to the \`ai*\` functions. NEVER assign \`page.locator()\` to a variable and then use it — if you find yourself writing \`const x = page.locator(...)\`, you are doing it wrong.
            * GOOD: \`await aiClick(page, "button#submit", "Submit form");\`
            * BAD: \`const btn = page.locator("button#submit"); await aiClick(page, btn, ...);\`
+           * BAD: \`const btn = page.locator("button#submit"); await btn.click();\`
          - **USAGE SIGNATURES (MANDATORY):**
            * \`await aiClick(page, "selector", "Action Description", { expectedUrlHint: "pattern", optional: true/false });\`
            * \`await aiFill(page, "selector", "Text to fill", "Action Description", { optional: true/false });\`
@@ -111,9 +113,12 @@ export class ClaudeService {
            * \`await aiWaitFor(page, "selector", "Waiting for XYZ", { state: 'visible', optional: true/false });\`
            * \`await aiWaitForURL(page, /regex/);\`
          - **OPTIONAL FLAG**: Use \`optional: true\` for elements that might not always appear (e.g. cookie banners, newsletter popups, conditional modals). This allows the test to continue if the element is missing even after healing.
-         - **NO BRANCHING LOGIC**: Do NOT use \`if (await locator.isVisible())\` or similar checks. Instead, use the \`optional\` flag inside the \`ai*\` call (e.g. \`aiClick(..., { optional: true })\`).
+         - **NO BRANCHING LOGIC**: Do NOT use \`if (await locator.isVisible())\`, \`if (await locator.count())\`, or any conditional DOM checks. Instead, use the \`optional\` flag inside the \`ai*\` call (e.g. \`aiClick(..., { optional: true })\`).
+         - **NO MANUAL VERIFICATION STEPS**: Do NOT write "verify element is dismissed/gone" steps using raw locators. Trust the \`optional\` flag — if the action succeeded with \`optional: true\`, the element was there; if not, it wasn't.
          - **URL ASSERTIONS**: ALWAYS use \`await aiWaitForURL(page, /regex/);\` for navigation checks. It will automatically trigger a "Situation Audit" if the URL doesn't match.
-         - Failures: Use \`expect.soft(page).toHaveURL(/regex/)\` for non-blocking assertions.
+         - **NEVER** add \`expect.soft(page).toHaveURL()\` for the same pattern immediately after \`aiWaitForURL\` — it is redundant and will fail if the audit accepted a different URL format. \`aiWaitForURL\` is the authoritative navigation check.
+         - **NEVER use negative URL patterns** like \`/(?!some-path)/\` in \`aiWaitForURL\` — these match immediately and create false positives. To assert you are NOT on a page, skip the assertion entirely or use a positive pattern for where you SHOULD be.
+         - **NEVER write meaningless assertions**: \`expect.soft(page).toBeTruthy()\` and \`expect.soft(locator).toBeTruthy()\` always pass — they prove nothing. Only assert something specific (e.g. \`toHaveURL\`, \`toHaveText\`). If you have nothing to assert, omit the step entirely.
          - PREFER \`page.goto('URL', { waitUntil: 'domcontentloaded' })\` for initial navigation.
       8. **Final Instruction:** Output ONLY raw TypeScript code for Playwright. No markdown backticks. No intro text.`
             : `7. **CYPRESS STEPS:** Identify key network requests and use cy.intercept/cy.wait.
@@ -163,33 +168,41 @@ export class ClaudeService {
             ? `\nRECORDING GROUND TRUTH: The recording showed this successful context brief during creation:\n${recordingContext}\nUse this to confirm the user's intended action and find the matching element in the current DOM.\n`
             : '';
 
-        const prompt = `Playwright interaction with "${failedSelector}" (action: "${description}") failed. Find a replacement selector in the current DOM.
+        const prompt = `Selector "${failedSelector}" for "${description}" failed. Find replacement.
 ${alreadyTriedNote}${urlHintNote}${recordingNote}
-IMPORTANT: The description above is an imperative test instruction, NOT the element's visible label. For example, "Click submit button to apply filters" means the element is probably labelled "Apply Filters" or "Submit" — do NOT use the full description phrase as text= content.
+KEY INSIGHT: "${description}" is a test instruction, NOT the element's label. Extract the actual UI element name from it.
+Example: "Click submit button to apply filters" → element is labeled "Apply Filters" or "Submit"
 
-The DOM context below includes:
-- "Current URL" — where the page is right now
-- "Visible element labels" — the actual text/aria-label of each element as seen by users (USE THIS to find the right element by its label)
-- "HTML snippets" — the raw HTML for fallback reference
-
-Prefer selectors in this order (most to least resilient):
-1. [data-testid="..."] or [data-cy="..."] or [data-test="..."]
-2. role= with name= — use the SHORT visible label from the labels list, e.g., role=button[name="All Digg"]
-3. [aria-label="..."] — use the actual label from the labels list
-4. Unique visible text from the labels list: button:has-text("All Digg") or text="Trending"
-5. Structural: parent > child with type (e.g., form > button[type=submit])
-6. [id="..."] or [name="..."] or [type="..."] attributes
-
-STRICT RULES — violating these will produce a broken selector:
-- NEVER use utility/design-token class names. These look like: group, relative, isolate, cursor-pointer, whitespace-nowrap, inline-flex, bg-*, text-*, border-*, ring-*, focus-visible:*, disabled:*, p-*, m-*, flex-*, rounded-*, gap-*, z-*, w-*, h-* — if it looks like a Tailwind or CSS-Modules class, DO NOT USE IT.
-- NEVER use a selector that contains more than 2 class names.
-- NEVER use a selector truncated mid-word (ending in "-te" or similar artifacts) — that means the class string was clipped.
-- If no stable attribute exists, use text content from the visible labels list, NOT classes.
-
-DOM (interactive elements only):
+DOM CONTEXT:
 ${domContext}
 
-Reply with ONLY the raw selector string, no quotes, no explanation.`;
+SELECTOR PRIORITY (use first available):
+1. [data-testid="..."] / [data-cy="..."] / [data-test="..."]
+2. role=button[name="Label"] (use SHORT label from "Visible element labels")
+3. [aria-label="Label"]
+4. button:has-text("Label") or text="Label"
+5. input[type="..."] / input[placeholder="..."]
+6. Structural: form > button[type=submit]
+7. #id or [name="..."]
+
+BANNED (auto-reject):
+- CSS utility classes: bg-*, text-*, flex-*, p-*, m-*, w-*, h-*, rounded-*, gap-*, cursor-*, group, relative, inline-*, hidden
+- More than 2 class names
+- Truncated mid-word (e.g., "data-testid*=")
+- Bare tags: div, span, button, a, input (must have attribute/text)
+- Any class attribute selector: [class*=...]
+- Auto-generated/volatile IDs: React IDs like _r_0_, _r_4k_, _r_b9_; numeric IDs like #123; long hex hashes. These change between renders and will immediately break. Use placeholder, aria-label, role, or data attributes instead.
+
+⚠️ OUTPUT RULES — MANDATORY:
+- Respond with ONLY the raw selector string. Nothing else.
+- NO explanation, reasoning, or prose before or after.
+- NO markdown code fences (\`\`\`).
+- NO quotes around the selector.
+- If you write anything other than the selector, the system will break.
+CORRECT: button[aria-label="Search"]
+WRONG: \`\`\`button[aria-label="Search"]\`\`\`
+WRONG: "Looking at the DOM, I can see that..."
+WRONG: "The selector is: button[aria-label="Search"]"`;
 
         try {
             const response = await this.anthropic.messages.create({
@@ -200,7 +213,17 @@ Reply with ONLY the raw selector string, no quotes, no explanation.`;
 
             const block = response.content.find(block => block.type === 'text');
             if (block && block.type === 'text') {
-                return block.text.trim();
+                let text = block.text.trim();
+                // Strip markdown fences if Claude ignored the output rules
+                text = text.replace(/^```[a-zA-Z0-9-]*\n?/i, "");
+                text = text.replace(/\n?```$/i, "");
+                // If Claude wrote prose, extract the first line that looks like a selector
+                const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+                // Find the first line that looks like a CSS/Playwright selector (not prose)
+                const selectorLine = lines.find(l =>
+                    /^([\[#\.]|role=|button|input|a\[|form|div\[|\*|svg)/.test(l) && !l.endsWith('.')
+                );
+                return (selectorLine || lines[0] || text).trim();
             }
             throw new Error("Could not extract new selector from Claude response.");
         } catch (e) {
@@ -220,25 +243,22 @@ Reply with ONLY the raw selector string, no quotes, no explanation.`;
             ? `\nRECORDING GROUND TRUTH: The user intended to reach a URL matching "${expectedStr}". The recording says:\n${recordingContext}\n`
             : '';
 
-        const prompt = `TEST AUDIT: A test expected the URL to match "${expectedStr}", but the current URL is "${currentUrl}".
+        const prompt = `URL MISMATCH AUDIT:
+Expected: "${expectedStr}"
+Current: "${currentUrl}"
 ${recordingNote}
-Look at the current DOM and Recording context below. Decide the best course of action.
+TASK: Analyze DOM and decide action.
 
-Possible outcomes:
-1. "continue" — The current page is correct; the URL just has extra params, hashes, or a slightly different slug than expected.
-2. "retry" — We are on the wrong page because a navigation action was missed or failed (e.g. we didn't actually click a submit button, or we are still on the login page). Propose a recovery action.
-3. "fail" — We are on a completely wrong/error page and cannot recover.
+OPTIONS:
+1. "continue" - URL differs but page is correct (extra params/hash/slug OK)
+2. "retry" - Wrong page, navigation failed. Propose recovery (missed click/enter)
+3. "fail" - Wrong page, no recovery possible
 
-DOM (interactive elements only):
+DOM:
 ${domContext}
 
-Return ONLY a JSON object: 
-{ 
-  "action": "continue" | "retry" | "fail", 
-  "message": "reasoning", 
-  "recoverySelector": "string if retry", 
-  "recoveryAction": "click" | "fill" | "press" 
-}`;
+OUTPUT (JSON only, no markdown):
+{"action": "continue|retry|fail", "message": "reason", "recoverySelector": "if retry", "recoveryAction": "click|press"}`;
 
         try {
             const response = await this.anthropic.messages.create({
@@ -263,15 +283,17 @@ Return ONLY a JSON object:
 
     async summarizeContext(rawContext: string): Promise<string> {
         const prompt = `
-      You are a technical analyst. I will provide you with raw technical logs (events, console, network) from a Jam.dev recording.
+      You are a technical analyst. I will provide you with raw technical logs (events, console, network, and optionally a video analysis and transcript) from a Jam.dev recording.
       Your goal is to summarize this data into a concise technical brief for a test engineer.
-      
+
       RULES:
       - Focus ONLY on actions that changed the UI state (clicks, typing, navigation).
       - Include ONLY critical network failures (4xx, 5xx) or important API responses.
       - Include ONLY error/warning console logs that are not background noise.
       - Keep the summary under 1000 tokens.
       - Maintain the "Typed [value] [key]" patterns as they are crucial for testing.
+      - If a VIDEO ANALYSIS section is present, extract the exact visible button labels, field names, and UI element text seen in the recording — these are the ground-truth labels to use in selectors. List them explicitly.
+      - If a VIDEO TRANSCRIPT section is present, include any spoken descriptions of what the user is doing or what bugs they observed.
 
       Raw Context:
       ${rawContext}
