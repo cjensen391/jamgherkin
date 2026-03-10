@@ -6,9 +6,9 @@ This project integrates [Jam.dev](https://jam.dev/) video summaries with Claude 
 
 ### 1. Automated Test Generation
 Pass a Jam.dev recording URL and the system writes test suites across all three formats.
-- **Playwright (`*.spec.ts`)**: Complete functional tests using `aiClick`/`aiFill`/`aiPress`/`aiWaitFor`/`aiWaitForURL` self-healing wrappers.
+- **Playwright (`*.spec.ts`)**: Complete functional tests using `aiClick`/`aiFill`/`aiPress`/`aiWaitFor`/`aiWaitForURL` self-healing wrappers. Prompts enforce strict selector rules: no raw `page.locator()` variables, no `nth/first/last/tripleClick`, no meaningless assertions, no negative URL lookaheads.
 - **Cypress (`*.cy.ts`)**: Cypress-equivalent UI tests with network intercepts and keystroke-accurate typing.
-- **Gherkin (`*.feature`)**: BDD-style Given/When/Then scenarios in plain business language.
+- **Gherkin (`*.feature`)**: BDD-style Given/When/Then scenarios in plain business language. Always outputs valid `.feature` syntax — even on 404 or empty recording context.
 
 *(Use Case: A QA engineer or PM records a bug in Jam. The system instantly generates automated regressions for Playwright and Cypress, closing the gap between manual reporting and automation.)*
 
@@ -19,6 +19,7 @@ Pass a Jam.dev recording URL and the system writes test suites across all three 
 - **Surgical Network Filtering**: Use CLI flags like `--status-code 5xx` or `--content-type application/json` to prune the technical "firehose" before it reaches the AI.
 - **Search & List**: Use `--list-jams` or search by title to find recordings without leaving the terminal.
 - **Auto-enable**: System automatically detects Jam URLs and enables context fetching if `JAM_TOKEN` is found.
+- **Video Analysis**: `getJamContext()` now fetches `analyzeVideo` and `getVideoTranscript` in parallel (best-effort). Visual observations and speech transcripts are appended to the recording brief with labelled sections. The `summarizeContext()` prompt extracts ground-truth UI labels from the video analysis to improve healing accuracy.
 
 ### 9. Navigation & Assertion Healing (aiWaitForURL)
 - **Active Navigation Auditing**: Traditional `waitForURL` simply timeouts if a match isn't found. `aiWaitForURL` triggers a **Situation Audit** upon failure.
@@ -45,13 +46,18 @@ Performs 3 quick attempts with a 1s delay. This handles "blink and you miss it" 
 
 **Phase 2 — Heuristic (no AI, no tokens):**
 Derives 30+ selector candidates from the original selector string and the element description. Each is tried with a 300ms probe.
+- **Stop-word filtering**: Action verbs and filler words (`wait`, `type`, `fill`, `press`, `visible`, `appear`, etc.) are excluded from text= candidates — prevents nonsense like `a:has-text("Wait")` from "Wait for search input".
+- **Data-value exclusion**: Words inside `has-text("Value")` of the original selector are treated as data values (e.g., a property name like "1 Infinite"), not UI labels, and excluded from healing candidates.
 
 **Phase 3 — Ground Truth Healing (Claude-powered):**
-If no heuristic works, Claude receives a compact DOM snapshot, the **Live Playwright Error**, and the original **"Ground Truth" brief** from the Jam recording.
-- **Context-Aware Recovery**: Claude uses the original technical context (what the user was doing, what network calls were made) to identify the intended element in the current, potentially broken DOM.
+If no heuristic works, Claude receives a compact DOM snapshot, the **Live Playwright Error**, and the original **"Ground Truth" brief** from the Jam recording (including video analysis).
+- **Context-Aware Recovery**: Claude uses the original technical context (what the user was doing, what network calls were made, what was visible on screen) to identify the intended element.
+- **Selector Validation**: Each Claude-proposed selector is validated against quality rules **before** being tried — Tailwind/utility classes and truncated selectors are auto-rejected immediately.
+- **Quality Feedback Loop**: Validation score and issues are passed back to Claude on retry so proposals improve each round.
 - **Error-Awareness**: Passes specific errors (e.g., `Element is not visible`, `is not an input`) to Claude so it can avoid suggesting elements that would cause the same failure.
 - **Fail-Fast Loops**: Tracks already-tried selectors to prevent AI "dead-ends."
 - **Attempt Limit**: Uses up to 5 attempts to find the most resilient fix.
+- **Volatile Selector Guard**: React auto-generated IDs (`_r_b9_`), hex hashes, and numeric IDs are detected as volatile and never cached or written back to source.
 
 *(Use Case: A developer renames a CSS class or moves an element. The first test to hit it calls Claude. Every subsequent test in the same video run uses the cached fix instantly — no extra AI cost or delay.)*
 - To prefer stable attributes (`data-testid`, role, aria) and never use Tailwind/CSS-Modules class names
@@ -136,8 +142,11 @@ Switch providers by changing the service instantiated in `index.ts`. Requires th
 - [x] Add transient retry loop for initial actions (handles loading/animations)
 - [x] Implement Navigation & Assertion Healing (`aiWaitForURL`)
 - [x] Implement Error-Aware Healing (passing Playwright errors to AI)
-- [x] Auto-update test source files in-place when a selector is healed
-- [ ] Validate Claude's proposed selector against priority rules
+- [x] Auto-update test source files in-place when a selector is healed (volatile selectors skipped)
+- [x] Validate Claude's proposed selector against priority rules before attempting
+- [x] Volatile selector detection — never cache React auto-IDs or hex hashes
+- [x] Data-value word exclusion from heuristic candidates
+- [x] Expanded stop-word list for heuristic phase
 
 ### Test Generation Improvements
 - [ ] Cypress self-healing wrappers (`cyClick`, `cyFill`) analogous to Playwright ones

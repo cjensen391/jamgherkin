@@ -9,16 +9,18 @@ Powered by **Claude** (default) or **Gemini** — both providers are fully suppo
 ## Features
 - 🤖 **Multi-Framework Output**: Automatically generates tests for Playwright (`.spec.ts`), Cypress (`.cy.ts`), and Gherkin (`.feature`).
 - 🧠 **Dual AI Providers**: Powered by **Claude** (default) or **Gemini** — both support Gherkin, self-healing wrappers, test-utils injection, auth env vars, and clean Gherkin prompts.
-- 📁 **Zero-Config Context (Jam MCP)**: Leverages the [Model Context Protocol](https://modelcontextprotocol.io/) to fetch full technical context (network, logs, events) directly from the Jam API.
+- 📁 **Zero-Config Context (Jam MCP)**: Leverages the [Model Context Protocol](https://modelcontextprotocol.io/) to fetch full technical context (network, logs, events, **video analysis**, and **transcript**) directly from the Jam API.
 - 🎮 **Interactive CLI Menu**: Run `npm run runQA` with no arguments to launch an interactive terminal prompt to fetch and select recent Jams.
 - 🎯 **Accurate Domain Isolation**: Automatically detects the domain under test by fetching `getUserEvents` via MCP, filtering out noisy 3rd-party traffic (`jam.dev`, analytics, etc.) by default.
 - 🌡️ **Advanced Network Filtering**: Surgical control over context via CLI flags: `--status-code`, `--content-type`, `--host`, and `--limit`.
 - 🛠️ **AI Self-Healing (Playwright)**: Emits custom `aiClick`, `aiFill`, `aiPress`, `aiWaitFor`, and `aiWaitForURL` wrappers. If a step fails, the system:
-  1. **Ground Truth Healing**: Uses the original Jam technical brief as a reference for perfect selector recovery.
+  1. **Ground Truth Healing**: Uses the original Jam technical brief (including video analysis) as a reference for perfect selector recovery.
   2. **Situation Audit (Navigation)**: If a URL mismatch occurs, Claude audits the live DOM to see if it can recover or skip the step.
   3. **Error-Aware Propagation**: Passes live Playwright errors (e.g. "is not an input") to the AI to prevent repetitive invalid guesses.
   4. **Fail-Fast Loops**: Tracks and excludes failing selectors to prevent AI "dead-ends".
-  5. **Heuristic phase**: Tries 30+ candidates (data-testid, roles, etc.) before calling AI.
+  5. **Heuristic phase**: Tries 30+ candidates (data-testid, roles, etc.) before calling AI — with stop-word filtering and data-value exclusion to prevent false candidates.
+  6. **Selector Validation**: Claude-proposed selectors are validated against quality rules before being tried — auto-rejects Tailwind classes and truncated selectors.
+  7. **Volatile Selector Guard**: React auto-generated IDs and hex hashes are never cached or written back to source files.
 - 🔎 **Token-Efficient DOM Extraction**: Sends only interactive elements (buttons, inputs, links, roles, aria- and data- attributes) to Claude — typically 5k chars vs 50k for the full body.
 - 🔐 **Intelligent Security**: Automatically redacts passwords, JWTs, and API keys from scraped Jam data before it reaches Claude. Auth flows inject `TEST_EMAIL` and `TEST_PASSWORD` from your `.env`.
 - 📄 **Clean Gherkin**: Noise-filters console errors, CDN URLs, timestamps, and browser metadata before generation so Gherkin reads as business language, not a debug log.
@@ -120,11 +122,12 @@ import { aiClick, aiFill, aiPress } from 'jamgherkin/self-heal';
 ## The Self-Healing Runtime
 When running Playwright tests, if a selector breaks:
 
-1. **Transient retry phase:** Performs 3 quick attempts with a 1s delay to handle temporary loading states or animations.
-2. **Heuristic phase (free, fast):** 30+ candidates are derived from the element description — slugged `data-testid`, role selectors, aria-labels, visible text, and common semantic patterns (`input[type=email]`, `button[type=submit]`, etc.).
-3. **Claude phase (5 attempts):** Claude reads a compact DOM snapshot, the **Playwright Error Context**, and the **Jam Ground Truth** to propose a fix. Results are cached in `test-results/heal-cache.json`.
-4. **aiWaitForURL Situation Audit:** If a navigation assertion fails, Claude audits the system state to decide if it can backtrack or continue.
-5. If healed, the new selector is logged with a `💡 TIP` to update the test suite.
+1. **Cache hit (Phase 0):** Checks `test-results/heal-cache.json` for a previously healed selector — skips all AI calls if found. Volatile selectors (React auto-IDs, hex hashes) are never cached.
+2. **Transient retry phase (Phase 1):** Performs 3 quick attempts with a 1s delay to handle temporary loading states or animations.
+3. **Heuristic phase (Phase 2, free, fast):** 30+ candidates derived from the element description — slugged `data-testid`, role selectors, aria-labels, visible text. Stop-word filtering prevents nonsense candidates like `a:has-text("Wait")`; data-value words from the original selector's `has-text()` are excluded to prevent matching data instead of UI labels.
+4. **Claude phase (Phase 3, up to 5 attempts):** Claude reads a compact DOM snapshot, the **Playwright Error Context**, and the **Jam Ground Truth** (including video analysis). Each proposed selector is validated against quality rules before being tried — Tailwind classes and truncated selectors are auto-rejected. Results are cached in `test-results/heal-cache.json` and written back to the source file.
+5. **aiWaitForURL Situation Audit (Phase 4):** If a navigation assertion fails, Claude audits the system state to decide if it can backtrack or continue.
+6. If healed, the new selector is automatically written back to the test source file to prevent repeated healing on the next run.
 
 ## Planned / TODO
 - [x] Record healed selectors to a persistent `heal-cache.json` for reuse across runs

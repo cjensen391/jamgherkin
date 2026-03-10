@@ -4,7 +4,53 @@ All notable changes to this project are documented here.
 
 ---
 
-## [Current] — 2026-03-09
+## [Current] — 2026-03-10
+
+### 🎥 Video Analysis Integration
+- **`analyzeVideo` + `getVideoTranscript`**: `getJamContext()` now calls these Jam MCP tools in parallel alongside events/logs/network (best-effort; silently skipped if unavailable).
+- **UI label extraction**: `summarizeContext()` prompt updated to extract ground-truth UI labels from the `VIDEO ANALYSIS` section — improves healing accuracy when text selectors are needed.
+- Video context appended to the recording brief with labelled sections (`--- VIDEO ANALYSIS ---`, `--- VIDEO TRANSCRIPT ---`) and size reported in console logs.
+
+### 🛡️ Self-Healing Hardening
+
+#### Volatile Selector Detection
+- Added `isVolatileSelector()` guard: React auto-generated IDs (`_r_b9_`), long hex hashes (`#abc12345`), and pure-numeric IDs are now detected as volatile.
+- `saveToCache()` skips volatile selectors with a warning — prevents broken cache entries across React re-renders.
+- `updateTestSourceFile()` skips volatile selectors with a warning — prevents updating source with selectors that will break on next render.
+
+#### Heuristic Selector Improvements
+- **Data-value word filtering**: Words inside `has-text("Value")` of the original selector are treated as data values, not UI labels. They are excluded from `text=` / `has-text()` healing candidates to prevent selectors like `a:has-text("1 Infinite")` (a property name, not a nav label).
+- **Expanded stop words**: Added `wait`, `waiting`, `type`, `typing`, `press`, `pressing`, `fill`, `filling`, `become`, `visible`, `appear`, `appears`, `loaded`, `show`, `shows`, `reveal`, `if`, `when`, `then`, `that`, `which`, `where`, `how`, `any` — prevents nonsense candidates like `a:has-text("Wait")` from "Wait for search input" descriptions.
+
+#### Selector Validation (Phase 3 Enhancement)
+- Claude-proposed selectors are now validated against quality rules **before** being attempted.
+- **Auto-rejection**: Tailwind/utility classes and truncated selectors are rejected immediately, saving network round-trips.
+- **Quality feedback loop**: Validation score and issues are passed back to Claude on retry so proposals improve each round.
+- **Best selector tracking**: Highest-scoring attempt is tracked even if none succeed, for debugging.
+
+### 🧪 Prompt Quality Improvements
+
+#### False Positive Elimination
+- Banned `locator.nth()`, `locator.first()`, `locator.last()`, `locator.tripleClick()` from generated tests — these raw Playwright APIs bypass healing wrappers.
+- Banned `const x = page.locator(...)` variable pattern — selectors must be inline string literals for healing to work.
+- Banned `locator.isVisible()`, `locator.count()` — raw Playwright queries that bypass self-healing.
+- Banned meaningless assertions: `expect.soft(page).toBeTruthy()`, `expect.soft(locator).toBeTruthy()`.
+- Banned negative URL lookahead regex in `aiWaitForURL` (e.g., `/(?!rental-applications\/new)/`).
+- Removed redundant `expect.soft(page).toHaveURL()` guidance when `aiWaitForURL` is already called for the same URL.
+
+#### Gherkin Reliability
+- Gherkin prompt now mandates valid `.feature` output regardless of context quality — prevents markdown prose or error messages being written to `.feature` files when recordings return 404 or empty data.
+- Added placeholder `Feature`/`Scenario` fallback instruction for edge cases.
+
+#### healSelector Prompt Hardening
+- Added explicit `CORRECT` / `WRONG` example pairs to eliminate prose-style responses.
+- Added markdown fence stripping (`\`\`\`...`) to `healSelector()` response parsing.
+- Added prose-extraction fallback: if response is multi-line, finds the first line that looks like a selector (starts with `[`, `#`, `role=`, `button`, `input`, `a[`, etc.).
+- Added volatile IDs (React `_r_*`, long hex hashes) to BANNED list in healing prompt.
+
+---
+
+## [Previous] — 2026-03-09
 
 #### Jam MCP Integration (Model Context Protocol) 📁
 - Replaced custom scraping with a direct connection to the [Jam MCP Server](https://mcp.jam.dev/mcp).

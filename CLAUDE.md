@@ -212,11 +212,31 @@ Self-healing cache stored at: `test-results/heal-cache.json`
 
 ## Recent Improvements
 
+### Video Analysis Integration
+- `getJamContext()` now calls `analyzeVideo` and `getVideoTranscript` in parallel (best-effort, errors silently ignored)
+- Visual observations and speech transcripts appended to recording brief under `--- VIDEO ANALYSIS ---` / `--- VIDEO TRANSCRIPT ---`
+- `summarizeContext()` prompt updated to extract ground-truth UI labels from the VIDEO ANALYSIS section
+
+### Volatile Selector Detection
+- `isVolatileSelector()` detects React auto-IDs (`_r_b9_`), long hex hashes, and pure-numeric IDs
+- `saveToCache()` and `updateTestSourceFile()` both skip volatile selectors with a warning
+
+### Heuristic Selector Improvements
+- **Stop words**: `wait`, `type`, `fill`, `press`, `become`, `visible`, `appear`, `show`, `when`, `then`, etc. excluded from text= candidates
+- **Data-value exclusion**: words inside original selector's `has-text("…")` are treated as data values, not UI labels, and excluded from candidates
+
 ### Selector Validation (Phase 3 Enhancement)
 - **Validation before trying**: Claude-proposed selectors are validated against quality rules before attempting to use them
 - **Auto-rejection of bad patterns**: Tailwind classes and truncated selectors are rejected immediately, saving time
 - **Quality feedback loop**: Validation scores and issues are passed back to Claude on retry for better proposals
 - **Best selector tracking**: System tracks highest-quality selector attempt even if none work perfectly
+
+### Prompt Quality Hardening
+- Banned `locator.nth/first/last/tripleClick`, raw `page.locator()` variable pattern, `locator.isVisible/count`
+- Banned meaningless assertions (`toBeTruthy` on page/locator), negative URL lookaheads
+- Removed redundant `expect.soft(page).toHaveURL()` after `aiWaitForURL` for same URL
+- Gherkin prompt mandates valid `.feature` output even on 404 / empty context
+- `healSelector` response parsing: strips markdown fences + prose-extraction fallback for multi-line responses
 
 ### Optimized Healing Prompts
 - **50% token reduction**: Healing prompts compressed from ~450 to ~200 words while maintaining clarity
