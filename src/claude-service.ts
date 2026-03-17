@@ -36,20 +36,53 @@ export class ClaudeService {
 
       CRITICAL RULES — failure to follow these makes the output useless:
       - IGNORE browser console noise unless it is the bug.
-      - IGNORE raw URLs and implementation details.
-      - DO NOT use technical selectors in step descriptions.
+      - IGNORE raw GET requests for assets, fonts, CDN, analytics, LogRocket, Sentry.
+      - DO NOT use raw URLs, selector names, or HTTP methods in step descriptions.
       - Write in plain business language using "I" as the actor.
-      - Focus on user goals.
+      - Focus on user goals AND the meaningful API interactions that result from them.
       - **OUTPUT FORMAT IS MANDATORY**: Your ENTIRE response must be valid Gherkin syntax starting with "Feature:". No markdown, no bullet points, no explanations. Even if context is missing or errored, output a placeholder Feature block with a comment — NEVER write prose.
+
+      NETWORK CALLS — what to include vs. ignore:
+      INCLUDE as "Then"/"And" steps (translate to business language):
+        - POST / PUT / PATCH / DELETE to your application's own API endpoints (form submissions, saves, creates, updates, deletes)
+        - Calls to payment processors (Stripe, Checkbook, PayScore) — e.g. "Then a payment of $X is submitted for processing"
+        - Calls to e-signature services (HelloSign, DocuSign) — e.g. "Then the lease agreement is sent for e-signature"
+        - Calls to background-check / screening services — e.g. "Then a background check is initiated for the applicant"
+        - Any 4xx or 5xx responses that represent the bug under test
+      IGNORE:
+        - GET requests for page assets, fonts, images, analytics, third-party tracking
+        - Successful auth token refreshes / session pings
+        - Websocket heartbeat / polling requests
 
       Jam Context:
       ${context}
+
+      INPUT FIELDS & KEYSTROKES — MANDATORY:
+      The context may contain lines like "Typed donald trump ↵" or "Typed john@example.com ↵".
+      These represent real user input and MUST be captured as individual "When" steps, e.g.:
+        - Typed donald trump ↵  →  When I type "donald trump" into the search field and press Enter
+        - Typed john@example.com ↵  →  When I enter "john@example.com" in the email field
+        - Typed password123 ↵  →  When I enter my password  (redact actual password values)
+        - Typed 123 Main St ↵  →  When I enter "123 Main St" in the address field
+      Rules for typed values:
+        - ALWAYS include the actual value in quotes for non-sensitive fields (search terms, names, addresses, amounts).
+        - REDACT passwords, SSNs, credit card numbers — write "my password" / "my SSN" instead.
+        - If ↵ ends the input, include "and press Enter" or "and submit" depending on context.
+        - Use the surrounding events (which field was focused, what page was open) to name the field naturally.
 
       Instructions:
       1. If context contains errors, 404s, or "Not Found" — still output a valid placeholder .feature file with a comment like "# Recording data unavailable" inside the Feature description.
       2. Otherwise, identify the core user flow or bug.
       3. Write a complete Gherkin Feature with one or more Scenarios using Given/When/Then.
-      4. Output ONLY the raw .feature file text. No markdown fences. No intro. No explanations. Start with "Feature:".
+         - "Given" steps set up preconditions (logged in, on a specific page, data already exists).
+         - "When" steps describe the user's actions (clicking buttons, AND typing into fields — include the actual values).
+         - "Then" steps describe the observable outcome — including any meaningful API calls translated to business language (submission confirmed, payment processed, document sent, error shown).
+         - Use "And" to chain multiple steps of the same type.
+      4. If the recording includes calls to integrations (Stripe, HelloSign, Checkbook, PayScore, etc.), add a "Then" step for each in plain language — e.g.:
+         - "Then the application fee payment is processed successfully"
+         - "Then the lease document is sent for electronic signature"
+         - "Then the tenant screening report is requested"
+      5. Output ONLY the raw .feature file text. No markdown fences. No intro. No explanations. Start with "Feature:".
     ` : `
       You are an expert QA engineer.
       I will provide you with the technical context extracted from a Jam.dev video recording (console logs, network requests, DOM events).
@@ -289,6 +322,9 @@ OUTPUT (JSON only, no markdown):
       RULES:
       - Focus ONLY on actions that changed the UI state (clicks, typing, navigation).
       - Include ONLY critical network failures (4xx, 5xx) or important API responses.
+      - ALWAYS preserve POST / PUT / PATCH / DELETE requests to application endpoints — these represent form submissions and data mutations that must appear in Gherkin steps.
+      - ALWAYS preserve calls to third-party integrations: payment processors (Stripe, Checkbook, PayScore), e-signature services (HelloSign, DocuSign), screening/background-check services. Note the endpoint, HTTP status, and any key response fields.
+      - IGNORE GET requests for assets, fonts, images, analytics, tracking, session pings.
       - Include ONLY error/warning console logs that are not background noise.
       - Keep the summary under 1000 tokens.
       - Maintain the "Typed [value] [key]" patterns as they are crucial for testing.

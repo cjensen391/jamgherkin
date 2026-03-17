@@ -6,7 +6,10 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "runQA": "tsx src/index.ts",
+    "generate": "SKIP_RUN=1 tsx src/index.ts",
     "discover": "tsx src/discover.ts",
+    "daemon": "tsx src/daemon.ts",
+    "test:unit": "node --import tsx/esm --test 'unit-tests/**/*.test.ts'",
     "build": "tsc --outDir dist"
   },
   "exports": {

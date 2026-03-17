@@ -1,164 +1,174 @@
-# JamGherkin Capabilities & Use Cases
-
-This project integrates [Jam.dev](https://jam.dev/) video summaries with Claude AI to automatically generate, refine, and maintain End-to-End (E2E) automated tests.
-
-## 🚀 Core Features & Use Cases
-
-### 1. Automated Test Generation
-Pass a Jam.dev recording URL and the system writes test suites across all three formats.
-- **Playwright (`*.spec.ts`)**: Complete functional tests using `aiClick`/`aiFill`/`aiPress`/`aiWaitFor`/`aiWaitForURL` self-healing wrappers. Prompts enforce strict selector rules: no raw `page.locator()` variables, no `nth/first/last/tripleClick`, no meaningless assertions, no negative URL lookaheads.
-- **Cypress (`*.cy.ts`)**: Cypress-equivalent UI tests with network intercepts and keystroke-accurate typing.
-- **Gherkin (`*.feature`)**: BDD-style Given/When/Then scenarios in plain business language. Always outputs valid `.feature` syntax — even on 404 or empty recording context.
-
-*(Use Case: A QA engineer or PM records a bug in Jam. The system instantly generates automated regressions for Playwright and Cypress, closing the gap between manual reporting and automation.)*
-
-### 8. Jam MCP Integration (Model Context Protocol)
-- **Zero-Config Context**: No more scraping video pages. JamGherkin connects directly to the [Jam MCP Server](https://mcp.jam.dev/mcp) to fetch high-fidelity technical events.
-- **Interactive CLI Menu**: `npm run runQA` with no arguments launches an interactive terminal prompt to fetch and select recent Jams.
-- **Accurate Domain Isolation**: First queries `getUserEvents` via MCP to find the true origin URL, correctly isolating the network to the recorded domain and silencing 3rd-party traffic.
-- **Surgical Network Filtering**: Use CLI flags like `--status-code 5xx` or `--content-type application/json` to prune the technical "firehose" before it reaches the AI.
-- **Search & List**: Use `--list-jams` or search by title to find recordings without leaving the terminal.
-- **Auto-enable**: System automatically detects Jam URLs and enables context fetching if `JAM_TOKEN` is found.
-- **Video Analysis**: `getJamContext()` now fetches `analyzeVideo` and `getVideoTranscript` in parallel (best-effort). Visual observations and speech transcripts are appended to the recording brief with labelled sections. The `summarizeContext()` prompt extracts ground-truth UI labels from the video analysis to improve healing accuracy.
-
-### 9. Navigation & Assertion Healing (aiWaitForURL)
-- **Active Navigation Auditing**: Traditional `waitForURL` simply timeouts if a match isn't found. `aiWaitForURL` triggers a **Situation Audit** upon failure.
-- **Claude "Truth" Comparison**: Claude compares the current live URL and DOM against the original recording's technical brief.
-- **Robust Parsing**: Built-in markdown stripping prevents JSON parse errors during audits.
-- **Intelligent Recovery**:
-  - **Minor Variation**: If the URL only differs by a non-critical slug or parameter, Claude marking the step as "Success" allows the test to proceed.
-  - **Missed Step**: If a navigation step was missed (e.g. a click didn't fire), Claude identifies the missing action and the system can backtrack to recover.
-  - **Terminal Failure**: Only fails if there is no path forward, preventing fragile timing-related crashes.
+# JamGherkin — Features & Capabilities
 
 ---
 
-## 🛠 Self-Healing Phases & Caching
-UI locators break when structure or class names change. JamGherkin mitigates flaky tests by bringing an LLM into the test runtime — as a last resort, not a first call.
+## Test Generation
 
-**Healing runs in five phases:**
+JamGherkin generates three test files from a single Jam recording:
 
+### Playwright (`*.spec.ts`)
+- Uses `aiClick`, `aiFill`, `aiPress`, `aiWaitFor`, `aiWaitForURL` self-healing wrappers
+- Strict selector rules: no raw `page.locator()` variables, no `nth/first/last`, no meaningless assertions
+- Injects `TEST_EMAIL` / `TEST_PASSWORD` for auth flows
+- Each `test()` block is self-contained with its own `page.goto()`
 
-**Phase 0 — Cache Hit:**
-Checks `test-results/heal-cache.json` for a previously successful fix for this selector. If found, it's tried immediately, skipping all AI calls and heuristics.
+### Cypress (`*.cy.ts`)
+- Network intercepts, keystroke-accurate typing, auth env var injection
+- Equivalent coverage to Playwright output
 
-**Phase 1 — Transient Retries:**
-Performs 3 quick attempts with a 1s delay. This handles "blink and you miss it" UI states (loading spinners, finishing animations) where the element is technically present but not yet interactive.
+### Gherkin (`*.feature`)
+- Plain-language BDD Given/When/Then scenarios
+- `Typed [value] ↵` events → `When I type "value" into <field>` steps
+- POST/PUT/DELETE API calls → `Then the <resource> is saved` steps
+- Integration calls (Stripe, HelloSign, etc.) → business-language `Then` steps
+- Always outputs valid `.feature` syntax even on 404 or empty context
 
-**Phase 2 — Heuristic (no AI, no tokens):**
-Derives 30+ selector candidates from the original selector string and the element description. Each is tried with a 300ms probe.
-- **Stop-word filtering**: Action verbs and filler words (`wait`, `type`, `fill`, `press`, `visible`, `appear`, etc.) are excluded from text= candidates — prevents nonsense like `a:has-text("Wait")` from "Wait for search input".
-- **Data-value exclusion**: Words inside `has-text("Value")` of the original selector are treated as data values (e.g., a property name like "1 Infinite"), not UI labels, and excluded from healing candidates.
+---
 
-**Phase 3 — Ground Truth Healing (Claude-powered):**
-If no heuristic works, Claude receives a compact DOM snapshot, the **Live Playwright Error**, and the original **"Ground Truth" brief** from the Jam recording (including video analysis).
-- **Context-Aware Recovery**: Claude uses the original technical context (what the user was doing, what network calls were made, what was visible on screen) to identify the intended element.
-- **Selector Validation**: Each Claude-proposed selector is validated against quality rules **before** being tried — Tailwind/utility classes and truncated selectors are auto-rejected immediately.
-- **Quality Feedback Loop**: Validation score and issues are passed back to Claude on retry so proposals improve each round.
-- **Error-Awareness**: Passes specific errors (e.g., `Element is not visible`, `is not an input`) to Claude so it can avoid suggesting elements that would cause the same failure.
-- **Fail-Fast Loops**: Tracks already-tried selectors to prevent AI "dead-ends."
-- **Attempt Limit**: Uses up to 5 attempts to find the most resilient fix.
-- **Volatile Selector Guard**: React auto-generated IDs (`_r_b9_`), hex hashes, and numeric IDs are detected as volatile and never cached or written back to source.
+## Jam MCP Integration
 
-*(Use Case: A developer renames a CSS class or moves an element. The first test to hit it calls Claude. Every subsequent test in the same video run uses the cached fix instantly — no extra AI cost or delay.)*
-- To prefer stable attributes (`data-testid`, role, aria) and never use Tailwind/CSS-Modules class names
+When `JAM_TOKEN` is set, JamGherkin connects directly to the [Jam MCP Server](https://mcp.jam.dev/mcp) instead of browser scraping:
 
-*(Use Case: A developer renames a CSS class from `.btn-primary` to a Tailwind utility chain. The `aiClick` wrapper finds the button via `role=button[name="Sign In"]` in the heuristic phase — no API call needed.)*
+- **Zero-config context**: Fetches network requests, console logs, user events, video analysis, and transcript via structured API
+- **Auto domain isolation**: Queries `getUserEvents` to find the true recording origin, silencing 3rd-party traffic automatically
+- **Surgical filtering**: `--status-code`, `--content-type`, `--host`, `--limit` flags for precise context control
+- **Integration traffic**: `--also-host` fetches traffic from additional domains (Stripe, HelloSign, etc.) in parallel
+- **Video analysis**: `analyzeVideo` + `getVideoTranscript` fetched in parallel — visual observations and speech improve healing accuracy
+- **Interactive CLI**: `npm run generate` with no arguments shows a menu to browse and select recent recordings
+- **Auto-enable**: Automatically detects Jam URLs + `JAM_TOKEN` and switches to MCP mode
 
-### 3. Token-Efficient DOM Context
-The DOM sent to Claude is aggressively trimmed:
-- Only interactive elements are included: `button`, `a`, `input`, `select`, `textarea`, `[role]`, `[aria-label]`, `[data-testid]`, `[name]`, `[id]`
-- Each element is a shallow snippet (no nested children markup, capped at 300 chars)
-- Inline `style` attributes are stripped
-- Max 150 elements — enough to find any element in practice
+---
 
-Typical payload: **~5k chars vs ~50k** for the full body strip approach.
+## Self-Healing Runtime
 
-### 4. Clean Gherkin Generation
-Raw Jam data is full of technical noise. Before sending to Claude, the pipeline:
-- **Filters out**: console errors, network CDN URLs, `net::ERR_*` failures, bare timestamps, browser/OS metadata, LogRocket/Sentry pings
-- **Keeps**: visible page text, user actions, navigation events
+When a Playwright selector fails, healing runs through five phases before the test fails:
 
-The Gherkin prompt instructs Claude to write in business language (no tag names, no URLs, no timestamps as steps), use "I" as the actor, and write scenarios around user goals.
+### Phase 0 — Cache
+Checks `test-results/heal-cache.json` for a previously healed selector. If found, uses it immediately — no AI calls. Volatile selectors (React auto-IDs like `_r_b9_`, hex hashes, numeric IDs) are never cached.
 
-*(Use Case: A Jam recording of a search flow used to produce Gherkin with steps like "When the user clicks a span element at 0:04". Now it produces "When I search for 'donald trump'")*
+### Phase 1 — Transient Retry
+3 quick retries with 1s delay. Handles loading spinners and animations where the element exists but isn't yet interactive.
 
-### 5. Environment Variable Injection for Authentication
-- **Dynamic Credentials**: Claude injects `process.env.TEST_EMAIL` / `Cypress.env('TEST_PASSWORD')` for any auth flows detected in the recording.
-- **No Hardcoded Secrets**: Populate `.env` to run tests against any environment.
+### Phase 2 — Heuristics (no AI)
+30+ selector candidates derived from the element description:
+- `data-testid`, `data-cy`, `data-test` slugs
+- `role=button[name="..."]`, `role=link[name="..."]`
+- `aria-label`, visible text, semantic type patterns
+- **Stop-word filtering**: verbs and filler words (`wait`, `fill`, `press`, `visible`, etc.) excluded from text= candidates
+- **Data-value exclusion**: words inside `has-text("...")` of the original selector treated as data, not UI labels
 
-### 6. Automated Sensitive Data Redaction
-- Passwords, API keys, Bearer tokens, and secrets are replaced with `***REDACTED***` before the payload reaches Claude.
+### Phase 3 — Claude Recovery (up to 5 attempts)
+Claude receives a compact DOM snapshot + the original Jam recording context:
+- **Selector validation**: each proposed selector validated before trying — Tailwind/utility classes and truncated selectors are auto-rejected
+- **Quality feedback**: validation score and issues passed back to Claude on each retry
+- **Error-aware**: live Playwright error message included so Claude avoids repeating bad guesses
+- **Fail-fast**: already-tried selectors excluded from subsequent attempts
 
-### 7. Cross-Repo Integration
-JamGherkin can write tests directly into another codebase and inject that repo's own test utilities into generated code — no copy-paste required.
+### Phase 4 — Navigation Audit (`aiWaitForURL`)
+When a URL assertion fails, Claude compares the live URL + DOM against the Jam recording to decide:
+- **Minor variation**: URL differs only by non-critical param → continue
+- **Missed step**: a navigation was skipped → attempt recovery
+- **Terminal failure**: no recovery path → fail with context
 
-**Configurable output directories** via CLI flags:
-- `--out-playwright <dir>` — write Playwright tests to any path
-- `--out-cypress <dir>` — write Cypress tests to any path
-- `--out-features <dir>` — write Gherkin features to any path
-- `--no-run` — skip automatically running the test after generation
+Healed selectors are written back to the test source file automatically so the next run is fast.
 
-**Test utility injection** via `--test-utils "<import-path>:<Export1>,<Export2>"`:
-Tell Claude what helper functions already exist in the target repo. Claude will import and use them in generated tests instead of reimplementing login flows, DB setup, etc. inline.
+---
+
+## Daemon Mode
+
+Run JamGherkin as a background service:
 
 ```bash
-npm run runQA -- https://jam.dev/c/abc123 \
+npm run daemon                  # watch for new Jams every 15 min
+npm run daemon -- --backfill    # also process all existing Jams on first run
+npm run daemon -- --interval 5  # custom poll interval in minutes
+```
+
+- Polls Jam MCP every 15 minutes (configurable)
+- New Jams queued and processed sequentially, oldest-first
+- State persisted to `daemon-state.json` — queue and processed history survive restarts
+- Failed Jams logged to `failedIds` and skipped (no infinite retry loops)
+- Graceful shutdown on SIGINT/SIGTERM
+
+---
+
+## Cross-Repo Integration
+
+Write tests directly into another codebase:
+
+```bash
+npm run generate -- https://jam.dev/c/abc123 \
   --out-playwright /path/to/other-repo/tests \
-  --test-utils "../test-utils/auth:loginAs,logoutAs" \
-  --test-utils "../test-utils/db:seedUser,clearDatabase" \
-  --no-run
+  --out-cypress    /path/to/other-repo/cypress/e2e \
+  --out-features   /path/to/other-repo/features \
+  --test-utils     "../test-utils/auth:loginAs,logoutAs" \
+  --test-utils     "../test-utils/db:seedUser,clearDatabase"
 ```
 
-**Importable self-heal module** via npm link or git URL:
+Claude imports and uses the specified helpers instead of reimplementing them inline.
+
+### Self-heal as a library
+```bash
+# npm link (local dev)
+cd jamgherkin && npm run build && npm link
+cd ../other-repo && npm link jamgherkin
+
+# or git dependency
+"jamgherkin": "github:your-org/jamgherkin"
+```
+
 ```ts
-import { aiClick, aiFill } from 'jamgherkin/self-heal';
+import { aiClick, aiFill, aiPress } from 'jamgherkin/self-heal';
 ```
-Install via `npm link` for local dev or `"jamgherkin": "github:your-org/jamgherkin"` as a git dependency.
 
-*(Use Case: A team maintains `other-repo` with a shared `loginAs()` helper. Running `runQA` with `--test-utils "../helpers:loginAs"` means every generated test automatically calls `loginAs()` at the top instead of duplicating the login steps.)*
+---
 
-### 8. Dual AI Provider Support
-Both **Claude** (`claude-service.ts`) and **Gemini** (`gemini-service.ts`) are fully supported with identical capabilities:
+## Security
+
+- Passwords, Bearer tokens, API keys, and secrets are redacted (`***REDACTED***`) before reaching Claude
+- Auth flows inject `TEST_EMAIL` / `TEST_PASSWORD` from `.env` — no hardcoded credentials in generated tests
+
+---
+
+## Dual AI Provider Support
 
 | Feature | Claude | Gemini |
 |---|---|---|
 | Playwright test generation | ✅ | ✅ |
 | Cypress test generation | ✅ | ✅ |
 | Gherkin BDD generation | ✅ | ✅ |
-| `aiClick`/`aiFill` wrapper instructions | ✅ | ✅ |
 | Auth env var injection | ✅ | ✅ |
-| `--test-utils` helper injection | ✅ | ✅ |
-| `domcontentloaded` guidance | ✅ | ✅ |
-| Self-healing (Claude-powered) | ✅ | — |
-
-Switch providers by changing the service instantiated in `index.ts`. Requires the corresponding API key (`ANTHROPIC_API_KEY` or `GEMINI_API_KEY`) in `.env`.
+| `--test-utils` injection | ✅ | ✅ |
+| Self-healing runtime | ✅ | — |
 
 ---
 
-## 📋 Planned / TODO
+## TODO
 
-### Self-Healing Improvements
-- [x] Write healed selectors to a persistent `heal-cache.json` for reuse across runs
-- [x] Add transient retry loop for initial actions (handles loading/animations)
-- [x] Implement Navigation & Assertion Healing (`aiWaitForURL`)
-- [x] Implement Error-Aware Healing (passing Playwright errors to AI)
-- [x] Auto-update test source files in-place when a selector is healed (volatile selectors skipped)
-- [x] Validate Claude's proposed selector against priority rules before attempting
+### Self-Healing
+- [x] Persistent `heal-cache.json` — reuse healed selectors across runs
+- [x] Transient retry loop
+- [x] `aiWaitForURL` navigation audit
+- [x] Error-aware healing (pass Playwright errors to Claude)
+- [x] Auto-update test source files when a selector is healed
+- [x] Selector validation before attempting Claude proposals
 - [x] Volatile selector detection — never cache React auto-IDs or hex hashes
-- [x] Data-value word exclusion from heuristic candidates
-- [x] Expanded stop-word list for heuristic phase
+- [x] Stop-word filtering in heuristic phase
+- [x] Data-value exclusion from heuristic candidates
+- [ ] Cypress self-healing wrappers (`cyClick`, `cyFill`)
 
-### Test Generation Improvements
-- [ ] Cypress self-healing wrappers (`cyClick`, `cyFill`) analogous to Playwright ones
-- [x] `--no-run` flag to skip running the generated test
-- [x] `--out-playwright` / `--out-cypress` / `--out-features` flags for custom output dirs
-- [x] `--test-utils` flag to inject helper imports into generated code
-- [x] Interactive CLI Menu to list and select videos
-- [ ] `--gherkin-only` flag to skip Playwright/Cypress generation
-- [ ] Batch mode: accept multiple Jam URLs in one run
-- [ ] Optional step to scan existing test files and de-duplicate against newly generated ones
+### Test Generation
+- [x] `--skip-run` / `SKIP_RUN` flag
+- [x] `--out-*` flags for custom output directories
+- [x] `--test-utils` flag for helper injection
+- [x] Interactive CLI menu
+- [x] Video analysis + transcript in context
+- [ ] `--gherkin-only` flag
+- [ ] Batch mode (multiple URLs in one run)
+- [ ] De-duplicate against existing test files
 
 ### Infrastructure
-- [ ] GitHub Actions workflow example for running generated tests in CI
-- [ ] Web dashboard to view generated tests, healing history, and selector suggestions
-- [ ] Support configurable Claude model per task (e.g. Sonnet for generation, Haiku for healing)
+- [x] Daemon mode with queue and persistent state
+- [x] Unit test suite (`npm run test:unit`)
+- [ ] GitHub Actions workflow example
+- [ ] Web dashboard for test history and healing logs

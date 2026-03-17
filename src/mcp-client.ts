@@ -97,7 +97,7 @@ export class JamMcpClient {
                         // The tool returns text, which might be JSON or a list.
                         // Based on the 'listJams' description, it returns Jam metadata.
                         const toolsResult = JSON.parse(json.result.content[0].text);
-                        return toolsResult;
+                        return Array.isArray(toolsResult) ? toolsResult : (toolsResult.jams ?? []);
                     } catch (e) {
                         // Fallback if it's not JSON
                         console.error("Could not parse listJams content as JSON:", json.result.content[0].text);
@@ -187,13 +187,17 @@ export class JamMcpClient {
             statusCode?: string | number | undefined;
             contentType?: string | undefined;
             host?: string | undefined;
+            alsoHosts?: string[] | undefined;
             limit?: number | undefined;
         } = {}
     ): Promise<string> {
         await this.ensureSession();
 
+        // Build list of integration hosts to fetch in parallel (primary + extras)
+        const integrationHosts = networkFilters.alsoHosts?.filter(Boolean) ?? [];
+
         // Fetch structured data in parallel
-        const [events, logs, network] = await Promise.all([
+        const [events, logs, network, ...integrationNetworks] = await Promise.all([
             this.fetchTool("getUserEvents", jamIdOrUrl, { limit: 100 }),
             this.fetchTool("getConsoleLogs", jamIdOrUrl, { limit: 20 }),
             this.fetchTool("getNetworkRequests", jamIdOrUrl, {
@@ -201,7 +205,15 @@ export class JamMcpClient {
                 statusCode: networkFilters.statusCode,
                 contentType: networkFilters.contentType,
                 host: networkFilters.host
-            })
+            }),
+            ...integrationHosts.map(h =>
+                this.fetchTool("getNetworkRequests", jamIdOrUrl, {
+                    limit: networkFilters.limit || 20,
+                    statusCode: networkFilters.statusCode,
+                    contentType: networkFilters.contentType,
+                    host: h
+                }).catch(() => "")
+            )
         ]);
 
         // Fetch visual analysis in parallel (best-effort — may not be available for all Jams)
@@ -210,11 +222,19 @@ export class JamMcpClient {
             this.fetchTool("getVideoTranscript", jamIdOrUrl).catch(() => ""),
         ]);
 
-        console.log(`   - Context sizes: Events=${events.length}, Logs=${logs.length}, Network=${network.length}${videoAnalysis ? `, VideoAnalysis=${videoAnalysis.length}` : ''}${transcript ? `, Transcript=${transcript.length}` : ''}`);
+        console.log(`   - Context sizes: Events=${events.length}, Logs=${logs.length}, Network=${network.length}${integrationHosts.length ? ` + ${integrationHosts.length} integration(s)` : ''}${videoAnalysis ? `, VideoAnalysis=${videoAnalysis.length}` : ''}${transcript ? `, Transcript=${transcript.length}` : ''}`);
 
         let context = `--- USER EVENTS ---\n${events}\n\n`;
         context += `--- CONSOLE LOGS ---\n${logs}\n\n`;
-        context += `--- NETWORK REQUESTS ---\n${network}\n`;
+        context += `--- NETWORK REQUESTS (primary: ${networkFilters.host || 'all'}) ---\n${network}\n`;
+
+        // Append integration traffic as separate labelled sections
+        integrationHosts.forEach((host, i) => {
+            const data = integrationNetworks[i];
+            if (data) {
+                context += `\n--- NETWORK REQUESTS (integration: ${host}) ---\n${data}\n`;
+            }
+        });
 
         if (videoAnalysis) {
             context += `\n--- VIDEO ANALYSIS (visual observations from recording) ---\n${videoAnalysis}\n`;

@@ -10,19 +10,22 @@ JamGherkin is an AI-powered test generation tool that transforms Jam.dev screen 
 
 ### Development
 ```bash
-# Generate tests from a Jam URL
+# Generate tests only (no test run) — preferred for CI / cross-repo use
+npm run generate -- <jam-url>
+
+# Generate tests AND immediately run them
 npm run runQA -- <jam-url>
 
 # Interactive mode (select from recent Jams)
-npm run runQA
+npm run generate
 
 # List recent Jam recordings
-npm run runQA -- --list-jams
+npm run generate -- --list-jams
 
 # Build TypeScript to dist/
 npm run build
 
-# Run generated tests (auto-runs after generation unless --no-run)
+# Run generated tests manually
 npx playwright test tests/<test-name>.spec.ts --headed
 ```
 
@@ -38,11 +41,14 @@ npx playwright test tests/<test-name>.spec.ts --headed
 --status-code <pattern>  # Filter by status code (e.g., "5xx", "404")
 --content-type <type>    # Filter by content type (e.g., "application/json")
 --host <domain>          # Override auto-detected domain isolation
+--also-host <domain>     # Include traffic from an additional host (repeatable)
+                         # e.g. --also-host api.stripe.com --also-host api.hellosign.com
 --limit <number>         # Cap network requests (default: 20)
 
 # Other
---no-run                 # Skip running generated test
+--skip-run               # Skip running generated test (or: SKIP_RUN=1 env var)
 --mcp-fetch              # Force MCP mode (auto-enabled if JAM_TOKEN exists)
+# Tip: use `npm run generate` instead of `npm run runQA` to always skip running
 ```
 
 ## Architecture
@@ -80,7 +86,7 @@ npx playwright test tests/<test-name>.spec.ts --headed
 **`mcp-client.ts`**: Jam MCP client for fetching technical context. Uses JSON-RPC over HTTP with session management. Provides:
 - `listJams()`: Fetch recent recordings
 - `searchJams()`: Search by URL or title
-- `getJamContext()`: Fetch network, console, user events
+- `getJamContext()`: Fetch network, console, user events, video analysis, transcript. Supports `alsoHosts` for parallel integration traffic fetching (Stripe, HelloSign, etc.)
 - `getJamDomain()`: Auto-detect recording domain from `getUserEvents`
 
 **`claude-service.ts`**: Claude AI service (default). Uses `claude-haiku-4-5-20251001` for cost efficiency. Handles test generation and selector healing.
