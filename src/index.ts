@@ -35,6 +35,8 @@ interface ParsedArgs {
     outPlaywright: string;
     outCypress: string;
     outFeatures: string;
+    outApi: string;
+    outFixtures: string;
     testUtils: Array<{ importPath: string; exports: string[] }>;
     mcpFetch: boolean;
     jamToken?: string;
@@ -45,6 +47,7 @@ interface ParsedArgs {
     host?: string | undefined;
     alsoHosts: string[];
     limit?: number | undefined;
+    scanDirs: string[];
 }
 
 function parseArgs(): ParsedArgs {
@@ -67,6 +70,8 @@ function parseArgs(): ParsedArgs {
             '  --out-playwright <dir>   Playwright output dir   (default: ./tests)',
             '  --out-cypress    <dir>   Cypress output dir      (default: ./cypress/e2e)',
             '  --out-features   <dir>   Gherkin output dir      (default: ./features)',
+            '  --out-api        <dir>   API integration test output dir (default: ./tests-api)',
+            '  --out-fixtures   <dir>   Cypress fixtures output dir (default: ./cypress/fixtures)',
             '  --test-utils     <spec>  Utility to inject, e.g. "../helpers:loginAs,setupTestDb"',
             '                           Repeat for multiple utility files.',
             '  --skip-run               Skip running the generated test',
@@ -76,6 +81,8 @@ function parseArgs(): ParsedArgs {
             '  --also-host <val>        Include traffic from an additional host (e.g. api.stripe.com).',
             '                           Repeat for multiple integrations: --also-host api.stripe.com --also-host api.hellosign.com',
             '  --limit <num>            Limit network requests (default: 20)',
+            '  --scan <dir>             Scan a target-repo directory for existing data-testid / aria-label / page objects',
+            '                           and feed them to the generator + self-healer. Repeat for multiple roots.',
         ].join('\n'));
         process.exit(0);
     }
@@ -108,6 +115,8 @@ function parseArgs(): ParsedArgs {
         outPlaywright: get('--out-playwright') ?? path.join(process.cwd(), 'tests'),
         outCypress: get('--out-cypress') ?? path.join(process.cwd(), 'cypress', 'e2e'),
         outFeatures: get('--out-features') ?? path.join(process.cwd(), 'features'),
+        outApi: get('--out-api') ?? path.join(process.cwd(), 'tests-api'),
+        outFixtures: get('--out-fixtures') ?? path.join(process.cwd(), 'cypress', 'fixtures'),
         testUtils,
         noRun: argv.includes('--skip-run') || process.env.SKIP_RUN === '1' || process.env.SKIP_RUN === 'true',
         listJams,
@@ -117,12 +126,13 @@ function parseArgs(): ParsedArgs {
         host: get('--host'),
         alsoHosts: getAll('--also-host'),
         limit: get('--limit') ? parseInt(get('--limit')!, 10) : undefined,
+        scanDirs: getAll('--scan'),
     };
 }
 
 async function main() {
     const args = parseArgs();
-    const { outPlaywright, outCypress, outFeatures, testUtils, noRun, listJams } = args;
+    const { outPlaywright, outCypress, outFeatures, outApi, outFixtures, testUtils, noRun, listJams } = args;
     let { jamUrl, mcpFetch } = args;
 
     const jamToken = process.env.JAM_TOKEN || "";
@@ -213,10 +223,13 @@ async function main() {
             outPlaywright,
             outCypress,
             outFeatures,
+            outApi,
+            outFixtures,
             testUtils,
             noRun,
             mcpFetch,
             alsoHosts: args.alsoHosts,
+            scanDirs: args.scanDirs,
             ...(args.statusCode !== undefined && { statusCode: args.statusCode }),
             ...(args.contentType !== undefined && { contentType: args.contentType }),
             ...(args.host !== undefined && { host: args.host }),

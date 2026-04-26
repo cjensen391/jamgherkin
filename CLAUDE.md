@@ -43,9 +43,11 @@ npx playwright test tests/<test-name>.spec.ts --headed
 ### Common CLI Options
 ```bash
 # Cross-repo test generation
---out-playwright <dir>   # Custom output directory for Playwright tests
---out-cypress <dir>      # Custom output directory for Cypress tests
---out-features <dir>     # Custom output directory for Gherkin features
+--out-playwright <dir>   # Custom output directory for Playwright tests (default: ./tests)
+--out-cypress <dir>      # Custom output directory for Cypress tests (default: ./cypress/e2e)
+--out-features <dir>     # Custom output directory for Gherkin features (default: ./features)
+--out-api <dir>          # Custom output directory for API integration tests (default: ./tests-api)
+--out-fixtures <dir>     # Custom output directory for Cypress fixtures (default: ./cypress/fixtures)
 --test-utils "<import-path>:<export1>,<export2>"  # Inject helper functions from target repo
 
 # Network filtering (MCP mode)
@@ -55,6 +57,11 @@ npx playwright test tests/<test-name>.spec.ts --headed
 --also-host <domain>     # Include traffic from an additional host (repeatable)
                          # e.g. --also-host api.stripe.com --also-host api.hellosign.com
 --limit <number>         # Cap network requests (default: 20)
+
+# Codebase context (target-repo selectors)
+--scan <dir>             # Scan a target-repo directory for existing data-testid /
+                         # aria-label / page object exports and feed them to the
+                         # generator + self-healer. Repeatable.
 
 # Other
 --skip-run               # Skip running generated test (or: SKIP_RUN=1 env var)
@@ -83,8 +90,9 @@ The pipeline is implemented as a single shared function `processJam()` in `src/p
 
 4. **Test Generation** (`claude-service.ts` / `gemini-service.ts`)
    - Sends sanitized context to Claude or Gemini
-   - Generates Playwright (`.spec.ts`), Cypress (`.cy.ts`), and Gherkin (`.feature`) tests
-   - Injects `TEST_EMAIL` / `TEST_PASSWORD` env vars for auth flows
+   - Generates four test files per recording — Playwright (`.spec.ts`, browser E2E), Cypress (`.cy.ts`, browser E2E), Gherkin (`.feature`, BDD spec), and API (`.api.spec.ts`, no-browser HTTP tests using Playwright's `request` fixture)
+   - **Cypress fixtures**: before Cypress generation, `claude.extractFixtures()` calls Claude to identify mockable API responses and writes each as a JSON file under `cypress/fixtures/<title>/`. The Cypress prompt is then told which fixtures exist and instructed to use `cy.intercept(method, urlPattern, { fixture, statusCode })` instead of inline mocks.
+   - Injects `TEST_EMAIL` / `TEST_PASSWORD` / `TEST_AUTH_TOKEN` env vars for auth flows
    - Includes `--test-utils` helpers if provided
 
 5. **Self-Healing Runtime** (`self-heal.ts`)
@@ -128,6 +136,15 @@ The pipeline is implemented as a single shared function `processJam()` in `src/p
 **`discover.ts`**: Standalone utility to list MCP tools and resources from the Jam server. Useful when adding new MCP calls.
 
 **`generate-final.ts`**: Standalone smoke test that generates Playwright + Cypress tests from a hard-coded context using `GeminiService`. Not part of the main pipeline — handy for quickly validating Gemini output without a real Jam fetch.
+
+**`scan-codebase.ts`**: Walks user-supplied target-repo directories (passed via `--scan`) and harvests:
+- `data-testid` / `data-cy` / `data-test` / `aria-label` values from any source file
+- Playwright fixtures: any file calling `test.extend(...)` or matching `*.fixture.ts` — exports labeled so the generator imports the extended `test` instead of reimplementing flows
+- Cypress custom commands: `Cypress.Commands.add('name', ...)` and `Cypress.Commands.overwrite(...)` — surfaced as `cy.<name>()` callables
+- Page objects: exports from `*.page.ts` / `*.po.ts`
+- Generic helpers: exports from files in `test-utils/`, `helpers/`, `fixtures/`, `support/` directories or matching `*.helpers.ts` / `*.utils.ts`
+
+Output is split into framework-tagged blocks (Playwright helpers / Cypress helpers / generic / page objects) and appended to `extractedContext` **after** summarization in `process-jam.ts`, so it lands in both the generator prompt and the recording context embedded for self-heal. Skips `node_modules`, `dist`, `build`, `.git`, test files; caps each section to keep prompt budget under control.
 
 ### Daemon State
 

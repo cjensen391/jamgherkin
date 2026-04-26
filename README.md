@@ -36,9 +36,11 @@ npm run generate
 ```
 
 Generated files land in:
-- `tests/<title>.spec.ts` — Playwright
-- `cypress/e2e/<title>.cy.ts` — Cypress
-- `features/<title>.feature` — Gherkin
+- `tests/<title>.spec.ts` — Playwright (browser E2E with self-healing)
+- `cypress/e2e/<title>.cy.ts` — Cypress (browser E2E)
+- `features/<title>.feature` — Gherkin (BDD spec)
+- `tests-api/<title>.api.spec.ts` — API integration test (no browser, Playwright's `request` fixture)
+- `cypress/fixtures/<title>/*.json` — Cypress fixture JSON files (one per mockable API response, referenced by the generated Cypress test via `cy.intercept(..., { fixture })`)
 
 ---
 
@@ -61,6 +63,8 @@ npm run test:unit                         # run unit tests
 | `--out-playwright <dir>` | Playwright output dir (default: `./tests`) |
 | `--out-cypress <dir>` | Cypress output dir (default: `./cypress/e2e`) |
 | `--out-features <dir>` | Gherkin output dir (default: `./features`) |
+| `--out-api <dir>` | API integration test output dir (default: `./tests-api`) |
+| `--out-fixtures <dir>` | Cypress fixture output dir (default: `./cypress/fixtures`) |
 | `--test-utils <spec>` | Inject helpers from target repo (repeatable) |
 | `--skip-run` | Skip running the generated test |
 | `--host <domain>` | Override auto-detected domain isolation |
@@ -68,6 +72,7 @@ npm run test:unit                         # run unit tests
 | `--status-code <pattern>` | Filter network by status code (e.g. `5xx`, `404`) |
 | `--content-type <type>` | Filter network by content type |
 | `--limit <n>` | Cap network requests fetched (default: 20) |
+| `--scan <dir>` | Scan target-repo directory for existing `data-testid` / `aria-label` / page objects and feed them to the generator + self-healer (repeatable) |
 
 ---
 

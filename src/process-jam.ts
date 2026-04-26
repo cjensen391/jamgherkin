@@ -1,5 +1,6 @@
 import { chromium } from "playwright";
 import { ClaudeService } from "./claude-service.js";
+import { scanCodebase } from "./scan-codebase.js";
 import fs from "fs";
 import path from "path";
 import { spawnSync } from "child_process";
@@ -8,6 +9,8 @@ export interface ProcessJamOptions {
     outPlaywright?: string;
     outCypress?: string;
     outFeatures?: string;
+    outApi?: string;
+    outFixtures?: string;
     testUtils?: Array<{ importPath: string; exports: string[] }>;
     noRun?: boolean;
     mcpFetch?: boolean;
@@ -16,6 +19,7 @@ export interface ProcessJamOptions {
     host?: string;
     alsoHosts?: string[];
     limit?: number;
+    scanDirs?: string[];
 }
 
 export async function processJam(jamUrl: string, opts: ProcessJamOptions = {}): Promise<void> {
@@ -23,6 +27,8 @@ export async function processJam(jamUrl: string, opts: ProcessJamOptions = {}): 
         outPlaywright = path.join(process.cwd(), 'tests'),
         outCypress = path.join(process.cwd(), 'cypress', 'e2e'),
         outFeatures = path.join(process.cwd(), 'features'),
+        outApi = path.join(process.cwd(), 'tests-api'),
+        outFixtures = path.join(process.cwd(), 'cypress', 'fixtures'),
         testUtils = [],
         noRun = false,
         statusCode,
@@ -30,6 +36,7 @@ export async function processJam(jamUrl: string, opts: ProcessJamOptions = {}): 
         host,
         alsoHosts = [],
         limit,
+        scanDirs = [],
     } = opts;
 
     const jamToken = process.env.JAM_TOKEN || "";
@@ -167,6 +174,17 @@ export async function processJam(jamUrl: string, opts: ProcessJamOptions = {}): 
         console.log(`✅ Summarization complete. New context length: ${extractedContext.length} chars.`);
     }
 
+    if (scanDirs.length > 0) {
+        console.log(`\n2.5. Scanning codebase for selectors in: ${scanDirs.join(', ')}...`);
+        const codebaseContext = scanCodebase(scanDirs);
+        if (codebaseContext) {
+            extractedContext += `\n\n--- CODEBASE SELECTORS ---\n${codebaseContext}`;
+            console.log(`✅ Codebase scan added ${codebaseContext.length} chars of selector context.`);
+        } else {
+            console.log("   No selectors / page objects found in scanned directories.");
+        }
+    }
+
     console.log("\n3. Generating Playwright test with Claude...");
     let playwrightTest = await claude.generateTest(extractedContext, "playwright", testUtils);
 
@@ -181,8 +199,35 @@ export async function processJam(jamUrl: string, opts: ProcessJamOptions = {}): 
     fs.writeFileSync(playwrightPath, playwrightTest);
     console.log(`\n💾 Saved Playwright test to: ${playwrightPath}`);
 
-    console.log("\n4. Generating Cypress test with Claude...");
-    const cypressTest = await claude.generateTest(extractedContext, "cypress", testUtils);
+    console.log("\n4a. Extracting Cypress fixtures from recorded responses...");
+    const fixtures = await claude.extractFixtures(extractedContext);
+    const fixtureRefs: Array<{ filename: string; method: string; urlPattern: string; statusCode: number }> = [];
+    if (fixtures.length > 0) {
+        const fixturesSubdir = path.join(outFixtures, `${safeTitle}`);
+        fs.mkdirSync(fixturesSubdir, { recursive: true });
+        const usedNames = new Set<string>();
+        for (const fix of fixtures) {
+            let name = fix.name.replace(/[^a-z0-9-]+/gi, '-').replace(/^-+|-+$/g, '').toLowerCase() || 'response';
+            let unique = name;
+            let n = 2;
+            while (usedNames.has(unique)) unique = `${name}-${n++}`;
+            usedNames.add(unique);
+            const fixturePath = path.join(fixturesSubdir, `${unique}.json`);
+            fs.writeFileSync(fixturePath, JSON.stringify(fix.body ?? null, null, 2));
+            fixtureRefs.push({
+                filename: `${safeTitle}/${unique}.json`,
+                method: fix.method.toUpperCase(),
+                urlPattern: fix.urlPattern,
+                statusCode: fix.statusCode,
+            });
+        }
+        console.log(`✅ Saved ${fixtureRefs.length} fixture(s) to: ${fixturesSubdir}`);
+    } else {
+        console.log("   No mockable responses found — Cypress test will use inline mocks if needed.");
+    }
+
+    console.log("\n4b. Generating Cypress test with Claude...");
+    const cypressTest = await claude.generateTest(extractedContext, "cypress", testUtils, fixtureRefs);
     console.log("\n--- Cypress Test ---");
     console.log(cypressTest);
 
@@ -201,10 +246,20 @@ export async function processJam(jamUrl: string, opts: ProcessJamOptions = {}): 
     fs.writeFileSync(gherkinPath, gherkinTest);
     console.log(`\n💾 Saved Gherkin feature to: ${gherkinPath}`);
 
+    console.log("\n6. Generating API integration test with Claude...");
+    const apiTest = await claude.generateTest(extractedContext, "api", testUtils);
+    console.log("\n--- API Test ---");
+    console.log(apiTest);
+
+    const apiPath = path.join(outApi, `${safeTitle}.api.spec.ts`);
+    fs.mkdirSync(path.dirname(apiPath), { recursive: true });
+    fs.writeFileSync(apiPath, apiTest);
+    console.log(`\n💾 Saved API test to: ${apiPath}`);
+
     console.log("\n✅ Generation complete!");
 
     if (!noRun) {
-        console.log("\n6. Running generated Playwright test (headed)...");
+        console.log("\n7. Running generated Playwright test (headed)...");
         const result = spawnSync(
             "npx",
             ["playwright", "test", playwrightPath, "--headed"],
