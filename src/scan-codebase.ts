@@ -9,15 +9,31 @@ const SCAN_EXTS = new Set([".tsx", ".ts", ".jsx", ".js", ".html", ".vue", ".svel
 const PAGE_OBJECT_FILE = /\.(page|po)\.(ts|tsx|js|jsx)$/i;
 const TEST_FILE = /\.(test|spec|cy)\.(ts|tsx|js|jsx)$/i;
 
+const PLAYWRIGHT_HELPER_FILE = /\.(fixture|fixtures)\.(ts|tsx|js|jsx)$/i;
+const CYPRESS_COMMAND_FILE = /\.(commands?|support)\.(ts|tsx|js|jsx)$/i;
+const HELPER_FILE = /\.(helpers?|utils?)\.(ts|tsx|js|jsx)$/i;
+const HELPER_DIR_HINT = /(^|[\/\\])(test-utils?|helpers|fixtures|support)([\/\\]|$)/i;
+const CYPRESS_DIR_HINT = /(^|[\/\\])cypress([\/\\]support|[\/\\]commands?)?([\/\\]|$)/i;
+
 const MAX_TESTIDS = 400;
 const MAX_ARIA = 200;
 const MAX_PAGE_OBJECTS = 50;
+const MAX_HELPERS = 50;
 const MAX_OUTPUT_CHARS = 8000;
+
+interface HelperFile {
+    file: string;
+    exports: string[];
+    notes?: string;
+}
 
 interface ScanResult {
     testIds: Set<string>;
     ariaLabels: Set<string>;
     pageObjects: Map<string, string[]>;
+    playwrightHelpers: Map<string, HelperFile>;
+    cypressCommands: Map<string, HelperFile>;
+    genericHelpers: Map<string, HelperFile>;
 }
 
 export function scanCodebase(dirs: string[]): string {
@@ -25,6 +41,9 @@ export function scanCodebase(dirs: string[]): string {
         testIds: new Set(),
         ariaLabels: new Set(),
         pageObjects: new Map(),
+        playwrightHelpers: new Map(),
+        cypressCommands: new Map(),
+        genericHelpers: new Map(),
     };
 
     for (const dir of dirs) {
@@ -79,10 +98,46 @@ function scanFile(filePath: string, result: ScanResult): void {
         if (m[1] && !m[1].includes("${")) result.ariaLabels.add(m[1]);
     }
 
-    if (PAGE_OBJECT_FILE.test(path.basename(filePath))) {
+    const baseName = path.basename(filePath);
+    const isPageObject = PAGE_OBJECT_FILE.test(baseName);
+    if (isPageObject) {
+        const exports = extractExports(content);
+        if (exports.length > 0) result.pageObjects.set(filePath, exports);
+    }
+
+    const cypressCmds = extractCypressCommands(content);
+    if (cypressCmds.length > 0) {
+        result.cypressCommands.set(filePath, {
+            file: filePath,
+            exports: cypressCmds,
+            notes: "registered via Cypress.Commands.add — call as cy.<name>(...)",
+        });
+    }
+
+    const hasPlaywrightFixture = /\btest\s*\.\s*extend\s*\(/.test(content);
+    if (hasPlaywrightFixture || PLAYWRIGHT_HELPER_FILE.test(baseName)) {
         const exports = extractExports(content);
         if (exports.length > 0) {
-            result.pageObjects.set(filePath, exports);
+            result.playwrightHelpers.set(filePath, {
+                file: filePath,
+                exports,
+                ...(hasPlaywrightFixture ? { notes: "extends Playwright `test` with fixtures — import `test` from this file instead of @playwright/test" } : {}),
+            });
+        }
+    }
+
+    const inHelperDir = HELPER_DIR_HINT.test(filePath);
+    const inCypressDir = CYPRESS_DIR_HINT.test(filePath);
+    const looksLikeHelper = HELPER_FILE.test(baseName);
+    const alreadyClassified = isPageObject
+        || result.cypressCommands.has(filePath)
+        || result.playwrightHelpers.has(filePath);
+
+    if (!alreadyClassified && (inHelperDir || looksLikeHelper)) {
+        const exports = extractExports(content);
+        if (exports.length > 0) {
+            const target = inCypressDir ? result.cypressCommands : result.genericHelpers;
+            target.set(filePath, { file: filePath, exports });
         }
     }
 }
@@ -93,48 +148,107 @@ function extractExports(content: string): string[] {
         /export\s+(?:default\s+)?class\s+(\w+)/g,
         /export\s+(?:async\s+)?function\s+(\w+)/g,
         /export\s+const\s+(\w+)/g,
+        /export\s+let\s+(\w+)/g,
+        /export\s+\{\s*([^}]+)\s*\}/g,
     ];
     for (const re of patterns) {
         for (const m of content.matchAll(re)) {
-            if (m[1]) names.add(m[1]);
+            if (!m[1]) continue;
+            if (re.source.startsWith("export\\s+\\{")) {
+                for (const raw of m[1].split(",")) {
+                    const name = raw.trim().split(/\s+as\s+/i).pop()?.trim();
+                    if (name && /^\w+$/.test(name)) names.add(name);
+                }
+            } else {
+                names.add(m[1]);
+            }
         }
     }
     return [...names];
 }
 
-function format(result: ScanResult): string {
-    const totalTestIds = result.testIds.size;
-    const totalAria = result.ariaLabels.size;
-    const totalPOs = result.pageObjects.size;
+function extractCypressCommands(content: string): string[] {
+    const names = new Set<string>();
+    const re = /Cypress\.Commands\.(?:add|overwrite)\s*(?:<[^>]+>\s*)?\(\s*['"]([\w$]+)['"]/g;
+    for (const m of content.matchAll(re)) {
+        if (m[1]) names.add(m[1]);
+    }
+    return [...names];
+}
 
-    if (totalTestIds === 0 && totalAria === 0 && totalPOs === 0) return "";
+function relPath(p: string): string {
+    return path.relative(process.cwd(), p);
+}
+
+function formatHelperBlock(label: string, entries: Map<string, HelperFile>, max: number): string | null {
+    if (entries.size === 0) return null;
+    const total = entries.size;
+    const list = [...entries.values()].slice(0, max);
+    const lines = list.map(h => {
+        const note = h.notes ? `  [${h.notes}]` : "";
+        return `  - ${relPath(h.file)}: ${h.exports.join(", ")}${note}`;
+    });
+    const heading = `\n${label} (${list.length}${total > list.length ? ` of ${total}` : ""}):`;
+    return `${heading}\n${lines.join("\n")}`;
+}
+
+function format(result: ScanResult): string {
+    const empty =
+        result.testIds.size === 0 &&
+        result.ariaLabels.size === 0 &&
+        result.pageObjects.size === 0 &&
+        result.playwrightHelpers.size === 0 &&
+        result.cypressCommands.size === 0 &&
+        result.genericHelpers.size === 0;
+    if (empty) return "";
 
     const sections: string[] = [];
     sections.push(
-        "These selectors and helpers exist in the target codebase. PREFER them when generating tests — match the recorded user actions to the closest existing test ID, aria label, or page object method.",
+        "These selectors and helpers exist in the target codebase. PREFER them when generating tests — match the recorded user actions to the closest existing test ID, aria label, command, fixture, or page object. If a Playwright helper or Cypress command exists for a flow (e.g. login, db seed), call it instead of reimplementing the steps inline.",
     );
 
-    if (totalTestIds > 0) {
+    if (result.testIds.size > 0) {
         const list = [...result.testIds].sort().slice(0, MAX_TESTIDS);
         sections.push(
-            `\nExisting data-testid / data-cy / data-test values (${list.length}${totalTestIds > list.length ? ` of ${totalTestIds}` : ""}):`,
+            `\nExisting data-testid / data-cy / data-test values (${list.length}${result.testIds.size > list.length ? ` of ${result.testIds.size}` : ""}):`,
             list.map(t => `  - ${t}`).join("\n"),
         );
     }
 
-    if (totalAria > 0) {
+    if (result.ariaLabels.size > 0) {
         const list = [...result.ariaLabels].sort().slice(0, MAX_ARIA);
         sections.push(
-            `\nExisting aria-label values (${list.length}${totalAria > list.length ? ` of ${totalAria}` : ""}):`,
+            `\nExisting aria-label values (${list.length}${result.ariaLabels.size > list.length ? ` of ${result.ariaLabels.size}` : ""}):`,
             list.map(a => `  - ${a}`).join("\n"),
         );
     }
 
-    if (totalPOs > 0) {
+    const playwright = formatHelperBlock(
+        "Playwright helpers — use these in Playwright tests (import from these files instead of reimplementing flows)",
+        result.playwrightHelpers,
+        MAX_HELPERS,
+    );
+    if (playwright) sections.push(playwright);
+
+    const cypress = formatHelperBlock(
+        "Cypress helpers — use these in Cypress tests (Cypress.Commands.add registers cy.<name>())",
+        result.cypressCommands,
+        MAX_HELPERS,
+    );
+    if (cypress) sections.push(cypress);
+
+    const generic = formatHelperBlock(
+        "Generic test helpers — usable from either framework if signatures match",
+        result.genericHelpers,
+        MAX_HELPERS,
+    );
+    if (generic) sections.push(generic);
+
+    if (result.pageObjects.size > 0) {
         const entries = [...result.pageObjects.entries()].slice(0, MAX_PAGE_OBJECTS);
         sections.push(
-            `\nPage objects (${entries.length}${totalPOs > entries.length ? ` of ${totalPOs}` : ""}):`,
-            entries.map(([file, exps]) => `  - ${path.relative(process.cwd(), file)}: ${exps.join(", ")}`).join("\n"),
+            `\nPage objects (${entries.length}${result.pageObjects.size > entries.length ? ` of ${result.pageObjects.size}` : ""}):`,
+            entries.map(([file, exps]) => `  - ${relPath(file)}: ${exps.join(", ")}`).join("\n"),
         );
     }
 
