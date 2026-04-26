@@ -1,5 +1,6 @@
 import { chromium } from "playwright";
 import { ClaudeService } from "./claude-service.js";
+import { scanCodebase } from "./scan-codebase.js";
 import fs from "fs";
 import path from "path";
 import { spawnSync } from "child_process";
@@ -16,6 +17,7 @@ export interface ProcessJamOptions {
     host?: string;
     alsoHosts?: string[];
     limit?: number;
+    scanDirs?: string[];
 }
 
 export async function processJam(jamUrl: string, opts: ProcessJamOptions = {}): Promise<void> {
@@ -30,6 +32,7 @@ export async function processJam(jamUrl: string, opts: ProcessJamOptions = {}): 
         host,
         alsoHosts = [],
         limit,
+        scanDirs = [],
     } = opts;
 
     const jamToken = process.env.JAM_TOKEN || "";
@@ -165,6 +168,17 @@ export async function processJam(jamUrl: string, opts: ProcessJamOptions = {}): 
         console.log(`\n⚠️ Context is large (${extractedContext.length} chars). Summarizing with Claude Haiku to save tokens...`);
         extractedContext = await claude.summarizeContext(extractedContext);
         console.log(`✅ Summarization complete. New context length: ${extractedContext.length} chars.`);
+    }
+
+    if (scanDirs.length > 0) {
+        console.log(`\n2.5. Scanning codebase for selectors in: ${scanDirs.join(', ')}...`);
+        const codebaseContext = scanCodebase(scanDirs);
+        if (codebaseContext) {
+            extractedContext += `\n\n--- CODEBASE SELECTORS ---\n${codebaseContext}`;
+            console.log(`✅ Codebase scan added ${codebaseContext.length} chars of selector context.`);
+        } else {
+            console.log("   No selectors / page objects found in scanned directories.");
+        }
     }
 
     console.log("\n3. Generating Playwright test with Claude...");

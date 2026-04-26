@@ -68,6 +68,7 @@ npm run test:unit                         # run unit tests
 | `--status-code <pattern>` | Filter network by status code (e.g. `5xx`, `404`) |
 | `--content-type <type>` | Filter network by content type |
 | `--limit <n>` | Cap network requests fetched (default: 20) |
+| `--scan <dir>` | Scan target-repo directory for existing `data-testid` / `aria-label` / page objects and feed them to the generator + self-healer (repeatable) |
 
 ---
 

@@ -45,6 +45,7 @@ interface ParsedArgs {
     host?: string | undefined;
     alsoHosts: string[];
     limit?: number | undefined;
+    scanDirs: string[];
 }
 
 function parseArgs(): ParsedArgs {
@@ -76,6 +77,8 @@ function parseArgs(): ParsedArgs {
             '  --also-host <val>        Include traffic from an additional host (e.g. api.stripe.com).',
             '                           Repeat for multiple integrations: --also-host api.stripe.com --also-host api.hellosign.com',
             '  --limit <num>            Limit network requests (default: 20)',
+            '  --scan <dir>             Scan a target-repo directory for existing data-testid / aria-label / page objects',
+            '                           and feed them to the generator + self-healer. Repeat for multiple roots.',
         ].join('\n'));
         process.exit(0);
     }
@@ -117,6 +120,7 @@ function parseArgs(): ParsedArgs {
         host: get('--host'),
         alsoHosts: getAll('--also-host'),
         limit: get('--limit') ? parseInt(get('--limit')!, 10) : undefined,
+        scanDirs: getAll('--scan'),
     };
 }
 
@@ -217,6 +221,7 @@ async function main() {
             noRun,
             mcpFetch,
             alsoHosts: args.alsoHosts,
+            scanDirs: args.scanDirs,
             ...(args.statusCode !== undefined && { statusCode: args.statusCode }),
             ...(args.contentType !== undefined && { contentType: args.contentType }),
             ...(args.host !== undefined && { host: args.host }),

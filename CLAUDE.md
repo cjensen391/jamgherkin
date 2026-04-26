@@ -56,6 +56,11 @@ npx playwright test tests/<test-name>.spec.ts --headed
                          # e.g. --also-host api.stripe.com --also-host api.hellosign.com
 --limit <number>         # Cap network requests (default: 20)
 
+# Codebase context (target-repo selectors)
+--scan <dir>             # Scan a target-repo directory for existing data-testid /
+                         # aria-label / page object exports and feed them to the
+                         # generator + self-healer. Repeatable.
+
 # Other
 --skip-run               # Skip running generated test (or: SKIP_RUN=1 env var)
 --mcp-fetch              # Force MCP mode (auto-enabled if JAM_TOKEN exists)
@@ -128,6 +133,8 @@ The pipeline is implemented as a single shared function `processJam()` in `src/p
 **`discover.ts`**: Standalone utility to list MCP tools and resources from the Jam server. Useful when adding new MCP calls.
 
 **`generate-final.ts`**: Standalone smoke test that generates Playwright + Cypress tests from a hard-coded context using `GeminiService`. Not part of the main pipeline — handy for quickly validating Gemini output without a real Jam fetch.
+
+**`scan-codebase.ts`**: Walks user-supplied target-repo directories (passed via `--scan`) and harvests `data-testid` / `data-cy` / `data-test` / `aria-label` values plus `*.page.ts` / `*.po.ts` exports. Output is appended to `extractedContext` **after** summarization in `process-jam.ts`, so it lands in both the generator prompt and the recording context embedded for self-heal. Skips `node_modules`, `dist`, `build`, `.git`, test files; caps results to keep prompt budget under control.
 
 ### Daemon State
 
