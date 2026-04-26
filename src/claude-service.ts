@@ -19,7 +19,7 @@ export class ClaudeService {
 
     async generateTest(
         context: string,
-        framework: "playwright" | "cypress" | "gherkin",
+        framework: "playwright" | "cypress" | "gherkin" | "api",
         testUtils: TestUtil[] = [],
     ): Promise<string> {
         // Build an optional block telling Claude what helper functions exist in the target repo
@@ -29,7 +29,32 @@ export class ClaudeService {
             ).join('\n')}\n      Prefer these helpers where relevant (e.g. for login flows, DB setup, common assertions).\n`
             : '';
 
-        const prompt = framework === "gherkin" ? `
+        const apiPrompt = `
+      You are an API test engineer. From the Jam recording's network traffic, generate focused HTTP integration tests using Playwright's \`request\` fixture (no browser needed — fast contract tests).
+
+      Jam Context:
+      ${context}
+      ${testUtilsNote}
+      CRITICAL RULES:
+      1. INCLUDE only meaningful mutations: POST / PUT / PATCH / DELETE to the application's own API + calls to integration services (Stripe, HelloSign, Checkbook, PayScore, etc.). Also include any 4xx/5xx response that represents the bug under test.
+      2. IGNORE: GETs for assets/fonts/images/analytics, auth token refreshes, websocket heartbeats, third-party trackers (Sentry, LogRocket, Segment).
+      3. Generate **one \`test()\` block per meaningful endpoint call** and group related calls in \`test.describe('Resource', ...)\`.
+      4. Each test:
+         - Uses Playwright's request fixture: \`test('POST /endpoint description', async ({ request }) => { ... })\`
+         - Sends the recorded HTTP method, URL path, and a faithful body (preserve field names + types from the recording).
+         - Asserts \`expect(response.status()).toBe(<recorded-status>)\`.
+         - Asserts on 1-3 key response fields (id, status, message, etc.) from the recorded response — use \`expect(body).toMatchObject({...})\` or \`expect(body.field).toBe(value)\`.
+      5. **TEST INDEPENDENCE**: Each \`test()\` block is self-contained. If auth is required, perform it inside the test (or via a \`test.beforeEach\` inside the describe).
+      6. **AUTH**: NEVER hardcode credentials or tokens.
+         - Bearer tokens: \`process.env.TEST_AUTH_TOKEN\` in \`headers: { Authorization: \\\`Bearer \\\${process.env.TEST_AUTH_TOKEN}\\\` }\`
+         - Login flow: POST to the auth endpoint with \`process.env.TEST_EMAIL\` / \`process.env.TEST_PASSWORD\` and reuse the returned token.
+      7. **REDACT** sensitive payload values: replace passwords, SSNs, credit card numbers, and API keys with env vars or the literal placeholder string \`"<redacted>"\`.
+      8. **BASE URL**: extract the host from recorded URLs and define it once: \`const BASE_URL = process.env.API_BASE_URL ?? 'https://...';\`. All requests use \`\\\`\\\${BASE_URL}/path\\\`\`.
+      9. If the recording contains NO meaningful mutations, output a single placeholder test with a clear comment explaining why (e.g. \`// Recording was read-only — no API mutations to assert.\`).
+      10. **Final Instruction**: Output ONLY raw TypeScript. Start with \`import { test, expect } from '@playwright/test';\`. No markdown fences, no intro text.
+    `;
+
+        const prompt = framework === "api" ? apiPrompt : framework === "gherkin" ? `
       You are a senior QA engineer writing BDD feature files for a product team.
       I will provide you with raw technical data scraped from a Jam.dev recording (console logs, network requests, DOM events, user actions).
       Your job is to write a clean, business-readable Gherkin feature file.

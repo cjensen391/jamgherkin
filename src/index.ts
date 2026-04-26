@@ -35,6 +35,7 @@ interface ParsedArgs {
     outPlaywright: string;
     outCypress: string;
     outFeatures: string;
+    outApi: string;
     testUtils: Array<{ importPath: string; exports: string[] }>;
     mcpFetch: boolean;
     jamToken?: string;
@@ -68,6 +69,7 @@ function parseArgs(): ParsedArgs {
             '  --out-playwright <dir>   Playwright output dir   (default: ./tests)',
             '  --out-cypress    <dir>   Cypress output dir      (default: ./cypress/e2e)',
             '  --out-features   <dir>   Gherkin output dir      (default: ./features)',
+            '  --out-api        <dir>   API integration test output dir (default: ./tests-api)',
             '  --test-utils     <spec>  Utility to inject, e.g. "../helpers:loginAs,setupTestDb"',
             '                           Repeat for multiple utility files.',
             '  --skip-run               Skip running the generated test',
@@ -111,6 +113,7 @@ function parseArgs(): ParsedArgs {
         outPlaywright: get('--out-playwright') ?? path.join(process.cwd(), 'tests'),
         outCypress: get('--out-cypress') ?? path.join(process.cwd(), 'cypress', 'e2e'),
         outFeatures: get('--out-features') ?? path.join(process.cwd(), 'features'),
+        outApi: get('--out-api') ?? path.join(process.cwd(), 'tests-api'),
         testUtils,
         noRun: argv.includes('--skip-run') || process.env.SKIP_RUN === '1' || process.env.SKIP_RUN === 'true',
         listJams,
@@ -126,7 +129,7 @@ function parseArgs(): ParsedArgs {
 
 async function main() {
     const args = parseArgs();
-    const { outPlaywright, outCypress, outFeatures, testUtils, noRun, listJams } = args;
+    const { outPlaywright, outCypress, outFeatures, outApi, testUtils, noRun, listJams } = args;
     let { jamUrl, mcpFetch } = args;
 
     const jamToken = process.env.JAM_TOKEN || "";
@@ -217,6 +220,7 @@ async function main() {
             outPlaywright,
             outCypress,
             outFeatures,
+            outApi,
             testUtils,
             noRun,
             mcpFetch,

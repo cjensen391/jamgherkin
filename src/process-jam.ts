@@ -9,6 +9,7 @@ export interface ProcessJamOptions {
     outPlaywright?: string;
     outCypress?: string;
     outFeatures?: string;
+    outApi?: string;
     testUtils?: Array<{ importPath: string; exports: string[] }>;
     noRun?: boolean;
     mcpFetch?: boolean;
@@ -25,6 +26,7 @@ export async function processJam(jamUrl: string, opts: ProcessJamOptions = {}): 
         outPlaywright = path.join(process.cwd(), 'tests'),
         outCypress = path.join(process.cwd(), 'cypress', 'e2e'),
         outFeatures = path.join(process.cwd(), 'features'),
+        outApi = path.join(process.cwd(), 'tests-api'),
         testUtils = [],
         noRun = false,
         statusCode,
@@ -215,10 +217,20 @@ export async function processJam(jamUrl: string, opts: ProcessJamOptions = {}): 
     fs.writeFileSync(gherkinPath, gherkinTest);
     console.log(`\n💾 Saved Gherkin feature to: ${gherkinPath}`);
 
+    console.log("\n6. Generating API integration test with Claude...");
+    const apiTest = await claude.generateTest(extractedContext, "api", testUtils);
+    console.log("\n--- API Test ---");
+    console.log(apiTest);
+
+    const apiPath = path.join(outApi, `${safeTitle}.api.spec.ts`);
+    fs.mkdirSync(path.dirname(apiPath), { recursive: true });
+    fs.writeFileSync(apiPath, apiTest);
+    console.log(`\n💾 Saved API test to: ${apiPath}`);
+
     console.log("\n✅ Generation complete!");
 
     if (!noRun) {
-        console.log("\n6. Running generated Playwright test (headed)...");
+        console.log("\n7. Running generated Playwright test (headed)...");
         const result = spawnSync(
             "npx",
             ["playwright", "test", playwrightPath, "--headed"],

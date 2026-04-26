@@ -43,9 +43,10 @@ npx playwright test tests/<test-name>.spec.ts --headed
 ### Common CLI Options
 ```bash
 # Cross-repo test generation
---out-playwright <dir>   # Custom output directory for Playwright tests
---out-cypress <dir>      # Custom output directory for Cypress tests
---out-features <dir>     # Custom output directory for Gherkin features
+--out-playwright <dir>   # Custom output directory for Playwright tests (default: ./tests)
+--out-cypress <dir>      # Custom output directory for Cypress tests (default: ./cypress/e2e)
+--out-features <dir>     # Custom output directory for Gherkin features (default: ./features)
+--out-api <dir>          # Custom output directory for API integration tests (default: ./tests-api)
 --test-utils "<import-path>:<export1>,<export2>"  # Inject helper functions from target repo
 
 # Network filtering (MCP mode)
@@ -88,8 +89,8 @@ The pipeline is implemented as a single shared function `processJam()` in `src/p
 
 4. **Test Generation** (`claude-service.ts` / `gemini-service.ts`)
    - Sends sanitized context to Claude or Gemini
-   - Generates Playwright (`.spec.ts`), Cypress (`.cy.ts`), and Gherkin (`.feature`) tests
-   - Injects `TEST_EMAIL` / `TEST_PASSWORD` env vars for auth flows
+   - Generates four files per recording — Playwright (`.spec.ts`, browser E2E), Cypress (`.cy.ts`, browser E2E), Gherkin (`.feature`, BDD spec), and API (`.api.spec.ts`, no-browser HTTP tests using Playwright's `request` fixture)
+   - Injects `TEST_EMAIL` / `TEST_PASSWORD` / `TEST_AUTH_TOKEN` env vars for auth flows
    - Includes `--test-utils` helpers if provided
 
 5. **Self-Healing Runtime** (`self-heal.ts`)

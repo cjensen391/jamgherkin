@@ -6,5 +6,6 @@ coverage/
 cypress/e2e/
 cypress/**/*.cy.ts
 tests/
+tests-api/
 features/
 test-results/
