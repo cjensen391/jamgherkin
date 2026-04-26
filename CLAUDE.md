@@ -22,6 +22,17 @@ npm run generate
 # List recent Jam recordings
 npm run generate -- --list-jams
 
+# Run as a background daemon (polls Jam MCP every 15 min for new recordings)
+npm run daemon
+npm run daemon -- --backfill        # also process all existing Jams on first run
+npm run daemon -- --interval 5      # poll every 5 minutes instead of 15
+
+# Standalone MCP exploration (lists tools/resources from the Jam MCP server)
+npm run discover
+
+# Unit tests (Node's built-in node:test runner — no extra deps)
+npm run test:unit
+
 # Build TypeScript to dist/
 npm run build
 
@@ -54,24 +65,29 @@ npx playwright test tests/<test-name>.spec.ts --headed
 ## Architecture
 
 ### Core Pipeline Flow
-1. **Context Extraction** (`index.ts`)
+The pipeline is implemented as a single shared function `processJam()` in `src/process-jam.ts`. Both `src/index.ts` (CLI) and `src/daemon.ts` (background watcher) call into it.
+
+1. **Context Extraction** (`process-jam.ts`)
    - **MCP Mode** (preferred): Uses `JamMcpClient` to fetch technical context via Model Context Protocol
    - **Scraper Mode** (fallback): Uses Playwright to scrape Jam.dev UI
    - Auto-enables MCP if `JAM_TOKEN` is present and URL contains "jam.dev"
    - Auto-isolates network traffic to recording domain via `getJamDomain()`
 
-2. **Data Sanitization** (`index.ts`)
+2. **Data Sanitization** (`process-jam.ts`, scraper path only — MCP context comes pre-cleaned)
    - Redacts passwords, Bearer tokens, API keys, secrets before sending to AI
    - Filters console noise, CDN URLs, timestamps, browser metadata
    - Preserves "Typed" actions for accurate input replay
 
-3. **Test Generation** (`claude-service.ts` / `gemini-service.ts`)
+3. **Summarization** (`claude-service.ts`)
+   - If extracted context exceeds 15,000 chars, `summarizeContext()` compresses it via Claude Haiku before generation
+
+4. **Test Generation** (`claude-service.ts` / `gemini-service.ts`)
    - Sends sanitized context to Claude or Gemini
    - Generates Playwright (`.spec.ts`), Cypress (`.cy.ts`), and Gherkin (`.feature`) tests
    - Injects `TEST_EMAIL` / `TEST_PASSWORD` env vars for auth flows
    - Includes `--test-utils` helpers if provided
 
-4. **Self-Healing Runtime** (`self-heal.ts`)
+5. **Self-Healing Runtime** (`self-heal.ts`)
    - Wraps Playwright actions: `aiClick`, `aiFill`, `aiPress`, `aiWaitFor`, `aiWaitForURL`
    - Multi-phase healing: cache → transient retry → heuristics → Claude-powered recovery
    - **Selector validation**: Validates proposed selectors against quality hierarchy before trying
@@ -81,7 +97,11 @@ npx playwright test tests/<test-name>.spec.ts --headed
 
 ### Key Modules
 
-**`index.ts`**: Main entry point. Parses CLI args, orchestrates context extraction (MCP or scraper), calls AI service, writes tests, runs Playwright.
+**`index.ts`**: CLI entry point. Parses CLI args, handles the interactive Jam picker, and delegates work to `processJam()`. No pipeline logic lives here — keep it that way.
+
+**`process-jam.ts`**: Shared pipeline. Exports `processJam(jamUrl, opts)` and the `ProcessJamOptions` interface. Owns context extraction (MCP or scraper), sanitization, summarization, and writing the three test files. Both `index.ts` and `daemon.ts` call into this.
+
+**`daemon.ts`**: Background watcher. Polls Jam MCP on an interval, queues new recordings, and processes them via `processJam()`. Core functions (`loadState`, `saveState`, `parseArgs`, `pollForNewJams`, `processQueue`, `tick`) are exported with injectable dependencies for unit testing. `main()` is guarded by an `import.meta.url` check so importing the module in tests does not auto-execute.
 
 **`mcp-client.ts`**: Jam MCP client for fetching technical context. Uses JSON-RPC over HTTP with session management. Provides:
 - `listJams()`: Fetch recent recordings
@@ -89,7 +109,7 @@ npx playwright test tests/<test-name>.spec.ts --headed
 - `getJamContext()`: Fetch network, console, user events, video analysis, transcript. Supports `alsoHosts` for parallel integration traffic fetching (Stripe, HelloSign, etc.)
 - `getJamDomain()`: Auto-detect recording domain from `getUserEvents`
 
-**`claude-service.ts`**: Claude AI service (default). Uses `claude-haiku-4-5-20251001` for cost efficiency. Handles test generation and selector healing.
+**`claude-service.ts`**: Claude AI service (default). Uses `claude-haiku-4-5-20251001` for cost efficiency. Handles test generation, context summarization, and selector healing.
 
 **`gemini-service.ts`**: Gemini AI service alternative (identical capabilities to Claude for test generation, no self-healing support).
 
@@ -103,9 +123,19 @@ npx playwright test tests/<test-name>.spec.ts --headed
    - **Quality Scoring**: Tracks scores (0-100) and tier (1-6) for each attempt
 5. **Phase 4 (Navigation Audit)**: For `aiWaitForURL` failures, Claude audits current state vs. expected to decide if test can continue
 
-**`fetch-context.ts`**: Legacy context extraction utilities (if MCP client is unavailable).
+**`fetch-context.ts`**: Legacy/standalone helper that calls the Jam MCP `get_jam` tool directly. Not used by the main pipeline — kept as a reference for raw MCP shape.
 
-**`discover.ts`**: Standalone utility to explore Jam recordings without generating tests.
+**`discover.ts`**: Standalone utility to list MCP tools and resources from the Jam server. Useful when adding new MCP calls.
+
+**`generate-final.ts`**: Standalone smoke test that generates Playwright + Cypress tests from a hard-coded context using `GeminiService`. Not part of the main pipeline — handy for quickly validating Gemini output without a real Jam fetch.
+
+### Daemon State
+
+- `daemon-state.json` (in repo root, gitignored via `.gitignore` patterns) stores `processedIds`, `failedIds`, `queue`, and `lastPollAt`.
+- Failed Jams are moved to `failedIds` and are **not** retried — there is no infinite retry loop.
+- New Jams are queued **oldest-first** (the MCP API returns newest-first; `tick()` reverses it).
+- State is saved after every queue item completes, so a crash mid-batch loses at most one in-flight item.
+- On first run with no `lastPollAt`, the daemon marks existing Jams as seen and waits for new ones — pass `--backfill` to also process the existing backlog.
 
 ### Important Patterns
 
@@ -140,11 +170,12 @@ This provides ground truth for healing.
 ## Environment Variables
 
 Required in `.env` (see `.env.example`):
-- `ANTHROPIC_API_KEY`: Claude API key (for test generation and self-healing)
+- `ANTHROPIC_API_KEY`: Claude API key (required for test generation and self-healing). Note: this is NOT in `.env.example` today — add it manually.
 - `GEMINI_API_KEY`: Google Gemini API key (alternative AI provider)
 - `JAM_TOKEN`: Jam.dev API token (for MCP mode, found in Jam dashboard)
 - `TEST_EMAIL`: Test account email (injected into auth flows)
 - `TEST_PASSWORD`: Test account password (injected into auth flows)
+- `SKIP_RUN`: Set to `1` or `true` to always skip the post-generation Playwright run (equivalent to `--skip-run`)
 
 ## Cross-Repo Integration
 
@@ -184,7 +215,7 @@ import { aiClick, aiFill, aiPress } from 'jamgherkin/self-heal';
 
 ### Adding New AI Providers
 1. Create `src/<provider>-service.ts` implementing `generateTest()` and `summarizeContext()`
-2. Update `index.ts` to instantiate the new service
+2. Update `process-jam.ts` to instantiate the new service (not `index.ts` — that only does CLI parsing)
 3. Add API key to `.env.example` and `CLAUDE.md`
 
 ### Modifying Healing Logic
@@ -207,16 +238,49 @@ MCP filtering happens in `mcp-client.ts` `getJamContext()`. Filters applied:
 - Content type filtering (`--content-type`)
 - Request limit (`--limit`)
 
+### Modifying the Daemon
+- All daemon helpers (`loadState`, `saveState`, `parseArgs`, `pollForNewJams`, `processQueue`, `tick`) are exported with **injectable dependencies** (state file path, MCP client, process function). When changing behavior, write the test against the exported function with mocks rather than spawning a real daemon.
+- `main()` is intentionally not exported and is guarded by `import.meta.url === fileURLToPath(process.argv[1])` so importing the module from tests does not start a polling loop.
+- State file path defaults to `DEFAULT_STATE_FILE` (`<cwd>/daemon-state.json`); pass an alternate path in tests to keep them isolated.
+
 ## Testing
 
-Playwright config: `playwright.config.ts`
+### Unit tests (`npm run test:unit`)
+- Runner: Node's built-in `node:test` (`node --import tsx/esm --test 'unit-tests/**/*.test.ts'`) — no additional test framework dependency.
+- Location: `unit-tests/*.test.ts` (separate from generated Playwright tests in `./tests`).
+- Current coverage: `unit-tests/daemon.test.ts` exercises all daemon helpers across 6 suites using temp state files for isolation.
+- Pattern when adding new tests: import from the `.js` extension (e.g. `from "../src/daemon.js"`) — required by the project's `nodenext` module resolution even though source is `.ts`.
+
+### Playwright (generated tests)
+- Config: `playwright.config.ts`
 - Test directory: `./tests`
 - Timeout: 120s (allows time for self-healing)
 - Action timeout: 10s
+- Self-healing cache stored at: `test-results/heal-cache.json`
 
-Self-healing cache stored at: `test-results/heal-cache.json`
+## Supplemental Docs
+
+- `README.md` — user-facing quick start and CLI reference (mirror this when changing CLI flags)
+- `FEATURES.md` — capability matrix and TODO checklist (update when shipping new features)
+- `CHANGELOG.md` — dated release notes (append a new dated section when making notable changes)
+
+When adding a feature, update **all three** alongside this file — they're independently consumed and drift quickly.
 
 ## Recent Improvements
+
+### Daemon Mode (latest)
+- New `npm run daemon` command — polls Jam MCP every 15 minutes (configurable via `--interval`) and processes new recordings sequentially
+- `--backfill` flag: process all existing Jams on first run (default: mark them as seen)
+- State persisted to `daemon-state.json` so the queue survives restarts
+- Failed Jams move to `failedIds` and are skipped on subsequent ticks (no infinite retry loops)
+- Graceful SIGINT/SIGTERM shutdown saves state before exit
+- Pipeline extracted to `src/process-jam.ts` and shared between `index.ts` and `daemon.ts`
+- Daemon helpers exported with injectable dependencies; `main()` guarded by `import.meta.url` so tests can import safely
+
+### Unit Test Suite
+- New `npm run test:unit` script using Node's built-in `node:test` runner (no new dependencies)
+- `unit-tests/daemon.test.ts` — 30 tests across 6 suites (`loadState`, `saveState`, `parseArgs`, `pollForNewJams`, `processQueue`, `tick`)
+- Tests use temp state files for isolation
 
 ### Video Analysis Integration
 - `getJamContext()` now calls `analyzeVideo` and `getVideoTranscript` in parallel (best-effort, errors silently ignored)
