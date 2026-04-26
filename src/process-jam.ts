@@ -10,6 +10,7 @@ export interface ProcessJamOptions {
     outCypress?: string;
     outFeatures?: string;
     outApi?: string;
+    outFixtures?: string;
     testUtils?: Array<{ importPath: string; exports: string[] }>;
     noRun?: boolean;
     mcpFetch?: boolean;
@@ -27,6 +28,7 @@ export async function processJam(jamUrl: string, opts: ProcessJamOptions = {}): 
         outCypress = path.join(process.cwd(), 'cypress', 'e2e'),
         outFeatures = path.join(process.cwd(), 'features'),
         outApi = path.join(process.cwd(), 'tests-api'),
+        outFixtures = path.join(process.cwd(), 'cypress', 'fixtures'),
         testUtils = [],
         noRun = false,
         statusCode,
@@ -197,8 +199,35 @@ export async function processJam(jamUrl: string, opts: ProcessJamOptions = {}): 
     fs.writeFileSync(playwrightPath, playwrightTest);
     console.log(`\n💾 Saved Playwright test to: ${playwrightPath}`);
 
-    console.log("\n4. Generating Cypress test with Claude...");
-    const cypressTest = await claude.generateTest(extractedContext, "cypress", testUtils);
+    console.log("\n4a. Extracting Cypress fixtures from recorded responses...");
+    const fixtures = await claude.extractFixtures(extractedContext);
+    const fixtureRefs: Array<{ filename: string; method: string; urlPattern: string; statusCode: number }> = [];
+    if (fixtures.length > 0) {
+        const fixturesSubdir = path.join(outFixtures, `${safeTitle}`);
+        fs.mkdirSync(fixturesSubdir, { recursive: true });
+        const usedNames = new Set<string>();
+        for (const fix of fixtures) {
+            let name = fix.name.replace(/[^a-z0-9-]+/gi, '-').replace(/^-+|-+$/g, '').toLowerCase() || 'response';
+            let unique = name;
+            let n = 2;
+            while (usedNames.has(unique)) unique = `${name}-${n++}`;
+            usedNames.add(unique);
+            const fixturePath = path.join(fixturesSubdir, `${unique}.json`);
+            fs.writeFileSync(fixturePath, JSON.stringify(fix.body ?? null, null, 2));
+            fixtureRefs.push({
+                filename: `${safeTitle}/${unique}.json`,
+                method: fix.method.toUpperCase(),
+                urlPattern: fix.urlPattern,
+                statusCode: fix.statusCode,
+            });
+        }
+        console.log(`✅ Saved ${fixtureRefs.length} fixture(s) to: ${fixturesSubdir}`);
+    } else {
+        console.log("   No mockable responses found — Cypress test will use inline mocks if needed.");
+    }
+
+    console.log("\n4b. Generating Cypress test with Claude...");
+    const cypressTest = await claude.generateTest(extractedContext, "cypress", testUtils, fixtureRefs);
     console.log("\n--- Cypress Test ---");
     console.log(cypressTest);
 

@@ -40,6 +40,7 @@ Generated files land in:
 - `cypress/e2e/<title>.cy.ts` — Cypress (browser E2E)
 - `features/<title>.feature` — Gherkin (BDD spec)
 - `tests-api/<title>.api.spec.ts` — API integration test (no browser, Playwright's `request` fixture)
+- `cypress/fixtures/<title>/*.json` — Cypress fixture JSON files (one per mockable API response, referenced by the generated Cypress test via `cy.intercept(..., { fixture })`)
 
 ---
 
@@ -63,6 +64,7 @@ npm run test:unit                         # run unit tests
 | `--out-cypress <dir>` | Cypress output dir (default: `./cypress/e2e`) |
 | `--out-features <dir>` | Gherkin output dir (default: `./features`) |
 | `--out-api <dir>` | API integration test output dir (default: `./tests-api`) |
+| `--out-fixtures <dir>` | Cypress fixture output dir (default: `./cypress/fixtures`) |
 | `--test-utils <spec>` | Inject helpers from target repo (repeatable) |
 | `--skip-run` | Skip running the generated test |
 | `--host <domain>` | Override auto-detected domain isolation |

@@ -36,6 +36,7 @@ interface ParsedArgs {
     outCypress: string;
     outFeatures: string;
     outApi: string;
+    outFixtures: string;
     testUtils: Array<{ importPath: string; exports: string[] }>;
     mcpFetch: boolean;
     jamToken?: string;
@@ -70,6 +71,7 @@ function parseArgs(): ParsedArgs {
             '  --out-cypress    <dir>   Cypress output dir      (default: ./cypress/e2e)',
             '  --out-features   <dir>   Gherkin output dir      (default: ./features)',
             '  --out-api        <dir>   API integration test output dir (default: ./tests-api)',
+            '  --out-fixtures   <dir>   Cypress fixtures output dir (default: ./cypress/fixtures)',
             '  --test-utils     <spec>  Utility to inject, e.g. "../helpers:loginAs,setupTestDb"',
             '                           Repeat for multiple utility files.',
             '  --skip-run               Skip running the generated test',
@@ -114,6 +116,7 @@ function parseArgs(): ParsedArgs {
         outCypress: get('--out-cypress') ?? path.join(process.cwd(), 'cypress', 'e2e'),
         outFeatures: get('--out-features') ?? path.join(process.cwd(), 'features'),
         outApi: get('--out-api') ?? path.join(process.cwd(), 'tests-api'),
+        outFixtures: get('--out-fixtures') ?? path.join(process.cwd(), 'cypress', 'fixtures'),
         testUtils,
         noRun: argv.includes('--skip-run') || process.env.SKIP_RUN === '1' || process.env.SKIP_RUN === 'true',
         listJams,
@@ -129,7 +132,7 @@ function parseArgs(): ParsedArgs {
 
 async function main() {
     const args = parseArgs();
-    const { outPlaywright, outCypress, outFeatures, outApi, testUtils, noRun, listJams } = args;
+    const { outPlaywright, outCypress, outFeatures, outApi, outFixtures, testUtils, noRun, listJams } = args;
     let { jamUrl, mcpFetch } = args;
 
     const jamToken = process.env.JAM_TOKEN || "";
@@ -221,6 +224,7 @@ async function main() {
             outCypress,
             outFeatures,
             outApi,
+            outFixtures,
             testUtils,
             noRun,
             mcpFetch,

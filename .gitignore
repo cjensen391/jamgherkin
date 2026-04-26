@@ -5,6 +5,7 @@ coverage/
 .DS_Store
 cypress/e2e/
 cypress/**/*.cy.ts
+cypress/fixtures/
 tests/
 tests-api/
 features/

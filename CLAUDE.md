@@ -47,6 +47,7 @@ npx playwright test tests/<test-name>.spec.ts --headed
 --out-cypress <dir>      # Custom output directory for Cypress tests (default: ./cypress/e2e)
 --out-features <dir>     # Custom output directory for Gherkin features (default: ./features)
 --out-api <dir>          # Custom output directory for API integration tests (default: ./tests-api)
+--out-fixtures <dir>     # Custom output directory for Cypress fixtures (default: ./cypress/fixtures)
 --test-utils "<import-path>:<export1>,<export2>"  # Inject helper functions from target repo
 
 # Network filtering (MCP mode)
@@ -89,7 +90,8 @@ The pipeline is implemented as a single shared function `processJam()` in `src/p
 
 4. **Test Generation** (`claude-service.ts` / `gemini-service.ts`)
    - Sends sanitized context to Claude or Gemini
-   - Generates four files per recording — Playwright (`.spec.ts`, browser E2E), Cypress (`.cy.ts`, browser E2E), Gherkin (`.feature`, BDD spec), and API (`.api.spec.ts`, no-browser HTTP tests using Playwright's `request` fixture)
+   - Generates four test files per recording — Playwright (`.spec.ts`, browser E2E), Cypress (`.cy.ts`, browser E2E), Gherkin (`.feature`, BDD spec), and API (`.api.spec.ts`, no-browser HTTP tests using Playwright's `request` fixture)
+   - **Cypress fixtures**: before Cypress generation, `claude.extractFixtures()` calls Claude to identify mockable API responses and writes each as a JSON file under `cypress/fixtures/<title>/`. The Cypress prompt is then told which fixtures exist and instructed to use `cy.intercept(method, urlPattern, { fixture, statusCode })` instead of inline mocks.
    - Injects `TEST_EMAIL` / `TEST_PASSWORD` / `TEST_AUTH_TOKEN` env vars for auth flows
    - Includes `--test-utils` helpers if provided
 

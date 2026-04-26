@@ -7,6 +7,15 @@ export interface TestUtil {
     exports: string[];
 }
 
+export interface CypressFixture {
+    /** kebab-case identifier (becomes the JSON filename) */
+    name: string;
+    method: string;
+    urlPattern: string;
+    statusCode: number;
+    body: unknown;
+}
+
 export class ClaudeService {
     private anthropic: Anthropic;
     private model: string;
@@ -21,6 +30,7 @@ export class ClaudeService {
         context: string,
         framework: "playwright" | "cypress" | "gherkin" | "api",
         testUtils: TestUtil[] = [],
+        cypressFixtures: Array<{ filename: string; method: string; urlPattern: string; statusCode: number }> = [],
     ): Promise<string> {
         // Build an optional block telling Claude what helper functions exist in the target repo
         const testUtilsNote = testUtils.length > 0
@@ -182,7 +192,11 @@ export class ClaudeService {
             : `7. **CYPRESS STEPS:** Identify key network requests and use cy.intercept/cy.wait.
          - DO NOT import describe/it/expect — they are globals.
          - DO NOT use Playwright syntax. ONLY use Cypress syntax.
-      8. **Final Instruction:** Output ONLY raw TypeScript code for Cypress. No markdown backticks. No intro text.`}
+${cypressFixtures.length > 0 ? `         - **PRE-GENERATED FIXTURES AVAILABLE** — these JSON files exist on disk. USE them via \`cy.intercept\` instead of inlining response bodies:
+${cypressFixtures.map(f => `           * cy.intercept('${f.method}', '${f.urlPattern}', { fixture: '${f.filename}', statusCode: ${f.statusCode} }).as('${f.filename.replace(/[^a-zA-Z0-9]+/g, '_')}');`).join('\n')}
+         - Wire each intercept BEFORE the action that triggers it (typically inside \`beforeEach\` or at the top of the test).
+         - After the action, \`cy.wait('@<alias>')\` to assert the request fired.
+         - **DO NOT** inline the response body in the test file when a fixture is listed above — always reference the fixture path.\n` : ''}      8. **Final Instruction:** Output ONLY raw TypeScript code for Cypress. No markdown backticks. No intro text.`}
     `;
 
         try {
@@ -203,6 +217,59 @@ export class ClaudeService {
         } catch (e) {
             console.error("Failed to generate with Claude", e);
             throw e;
+        }
+    }
+
+    async extractFixtures(context: string): Promise<CypressFixture[]> {
+        const prompt = `From the Jam recording's network traffic below, extract API responses that should be mocked in a Cypress test.
+
+INCLUDE:
+- POST / PUT / PATCH / DELETE responses to the application's own API
+- Any 4xx/5xx response that represents the bug under test
+- Calls to integration services (Stripe, HelloSign, Checkbook, PayScore, etc.)
+- Key GET responses that drive UI rendering (e.g. list endpoints whose data the page renders)
+
+EXCLUDE: assets, fonts, images, analytics, websocket heartbeats, auth token refreshes, third-party trackers (Sentry, LogRocket, Segment).
+
+For each mockable response, output a JSON object with:
+  - "name": kebab-case identifier (e.g. "create-tenant", "list-properties"). MUST be unique within the array.
+  - "method": HTTP method ("GET", "POST", etc.)
+  - "urlPattern": Cypress glob URL pattern. Prefer "**/api/<path>" so it matches any base URL. For dynamic IDs use "*" (e.g. "**/api/tenants/*").
+  - "statusCode": numeric HTTP status from the recording (default 200 if unclear)
+  - "body": the response body. If the recording shows JSON, parse it and embed the object/array directly. If the body is a string, use the string. If no body or only an empty body is visible, use null.
+
+If no mockable responses are found, output an empty array [].
+
+Recording context:
+${context}
+
+Output ONLY a valid JSON array. No markdown fences. No prose. Start with [.`;
+
+        try {
+            const response = await this.anthropic.messages.create({
+                model: this.model,
+                max_tokens: 6000,
+                messages: [{ role: "user", content: prompt }],
+            });
+            const block = response.content.find(b => b.type === "text");
+            if (!block || block.type !== "text") return [];
+            let text = block.text.trim();
+            text = text.replace(/^```[a-zA-Z0-9-]*\n/, "").replace(/\n```$/, "").trim();
+            const start = text.indexOf("[");
+            const end = text.lastIndexOf("]");
+            if (start === -1 || end === -1 || end < start) return [];
+            const arr = JSON.parse(text.slice(start, end + 1));
+            if (!Array.isArray(arr)) return [];
+            return arr.filter((f: unknown): f is CypressFixture =>
+                typeof f === "object" && f !== null
+                && typeof (f as CypressFixture).name === "string"
+                && typeof (f as CypressFixture).method === "string"
+                && typeof (f as CypressFixture).urlPattern === "string"
+                && typeof (f as CypressFixture).statusCode === "number"
+            );
+        } catch (e) {
+            console.warn("[Fixtures] Extraction failed, falling back to inline mocks:", e);
+            return [];
         }
     }
 
